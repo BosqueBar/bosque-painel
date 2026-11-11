@@ -4,7 +4,9 @@
 export class ErroApp extends Error {}
 
 export function criarDb(env) {
-  const base = String(env.SUPABASE_URL || '').replace(/\/+$/, '');
+  // Só o endereço do projeto (https://xxxx.supabase.co): se vier com /rest/v1 ou outro caminho colado junto, descarta.
+  let base = String(env.SUPABASE_URL || '').trim();
+  try { base = new URL(/^https?:\/\//i.test(base) ? base : 'https://' + base).origin; } catch (e) { base = ''; }
   const key = String(env.SUPABASE_SERVICE_KEY || '').trim();
   if (!base || !key) throw new ErroApp('Servidor sem configuração do banco (SUPABASE_URL / SUPABASE_SERVICE_KEY).');
 
