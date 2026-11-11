@@ -1,0 +1,15 @@
+{
+  "name": "bosque-painel",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  // Coletor: a Cloudflare chama o Worker a cada 1 minuto. Fora do horário de evento ele só confere e volta.
+  "triggers": { "crons": ["* * * * *"] },
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}
