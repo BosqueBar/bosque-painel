@@ -3,6 +3,7 @@
 import { criarDb } from './db.js';
 import { coletarSympla } from './fontes/sympla.js';
 import { coletarZigIngressos } from './fontes/zig_ingressos.js';
+import { coletarZigBar } from './fontes/zig_bar.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -54,6 +55,11 @@ async function teste(url, env) {
     }
     if (fonte === 'zig_ingressos') {
       const r = await coletarZigIngressos(env, dia);
+      r.segundos = Math.round((Date.now() - t0) / 100) / 10;
+      return json(r);
+    }
+    if (fonte === 'zig_bar') {
+      const r = await coletarZigBar(env, dia);
       r.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(r);
     }
