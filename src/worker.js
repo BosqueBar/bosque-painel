@@ -4,6 +4,7 @@ import { criarDb } from './db.js';
 import { coletarSympla } from './fontes/sympla.js';
 import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 import { coletarZigBar } from './fontes/zig_bar.js';
+import { coletarUgo } from './fontes/ugo.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -60,6 +61,16 @@ async function teste(url, env) {
     }
     if (fonte === 'zig_bar') {
       const r = await coletarZigBar(env, dia);
+      r.segundos = Math.round((Date.now() - t0) / 100) / 10;
+      return json(r);
+    }
+    if (fonte === 'ugo') {
+      // a UGO cruza com os e-mails (em hash) dos compradores da Sympla da mesma noite
+      const db = criarDb(env);
+      let hashes = null;
+      try { const sy = await coletarSympla(env, db, dia); hashes = { pagos: sy.hash_emails_pagos, cortesia: sy.hash_emails_cortesia }; } catch (e) { /* sem cruzamento */ }
+      const r = await coletarUgo(env, db, dia, hashes);
+      r.cruzou_com_sympla = !!hashes;
       r.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(r);
     }
