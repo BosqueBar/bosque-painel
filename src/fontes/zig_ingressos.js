@@ -1,4 +1,4 @@
-// Fonte: ZigTickets / SuperTicket (venda na porta). Porta do painel atual (buscarZigTicketsHoje_).
+// Fonte: ZigTickets / SuperTicket (venda na porta). Dias sem evento fixo (segunda, terça, quarta) só precisam do token quando houver evento extra. Porta do painel atual (buscarZigTicketsHoje_).
 // Regras que vêm do painel atual:
 //  - Um token por dia da semana (SUPERTICKET_TOKEN_QUI/SEX/SAB/DOM e QUA). O token aponta para o evento daquele dia da semana:
 //    a API não filtra por data, então só dá para reler a noite enquanto ela é o evento atual daquele token.
@@ -8,7 +8,7 @@
 import { buscarJson, diaSemana, horaDaNoite } from '../util.js';
 
 const BASE = 'https://public-api.superticket.com.br';
-const PROP_POR_DIA = { 0: 'SUPERTICKET_TOKEN_DOM', 3: 'SUPERTICKET_TOKEN_QUA', 4: 'SUPERTICKET_TOKEN_QUI', 5: 'SUPERTICKET_TOKEN_SEX', 6: 'SUPERTICKET_TOKEN_SAB' };
+const PROP_POR_DIA = { 0: 'SUPERTICKET_TOKEN_DOM', 1: 'SUPERTICKET_TOKEN_SEG', 2: 'SUPERTICKET_TOKEN_TER', 3: 'SUPERTICKET_TOKEN_QUA', 4: 'SUPERTICKET_TOKEN_QUI', 5: 'SUPERTICKET_TOKEN_SEX', 6: 'SUPERTICKET_TOKEN_SAB' };
 
 const ehCortesia = (t) => String(t.lot_name || '').toLowerCase().includes('cortesia') || Number(t.price) === 0;
 function porGenero(itens) {
