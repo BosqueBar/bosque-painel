@@ -17,7 +17,11 @@ export async function buscarJson(url, opcoes, ms) {
   const txt = await r.text();
   let j;
   try { j = JSON.parse(txt); } catch (e) { throw new Error('resposta que não é JSON (' + r.status + ') em ' + new URL(url).host); }
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' em ' + new URL(url).host + (j && (j.message || j.error) ? ': ' + (j.message || j.error) : ''));
+  if (!r.ok) {
+    const e = new Error('HTTP ' + r.status + ' em ' + new URL(url).host + (j && (j.message || j.error) ? ': ' + (j.message || j.error) : ''));
+    e.status = r.status;
+    throw e;
+  }
   return j;
 }
 

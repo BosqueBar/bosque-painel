@@ -20,7 +20,14 @@ function porGenero(itens) {
 async function todosTickets(token) {
   let pagina = 1, todos = [], total = null;
   while (pagina <= 200) {
-    const j = await buscarJson(BASE + '/tickets?page=' + pagina + '&perPage=1000', { headers: { Authorization: 'Bearer ' + token } }, 25000);
+    let j;
+    try { j = await buscarJson(BASE + '/tickets?page=' + pagina + '&perPage=1000', { headers: { Authorization: 'Bearer ' + token } }, 25000); }
+    catch (e) {
+      // 404 "No tickets found for the provided Event ID" = o evento do token ainda não vendeu nenhum ingresso (normal antes da porta abrir).
+      // Não é erro: conta como zero. Token inválido (401/403) e falhas de rede continuam sendo erro.
+      if (e.status === 404 && pagina === 1) return { itens: [], total: 0 };
+      throw e;
+    }
     const dados = j.data || [];
     todos = todos.concat(dados);
     total = j.total != null ? j.total : total;
