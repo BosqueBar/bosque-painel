@@ -123,7 +123,7 @@ export async function rodarAgendado(env, db) {
   try { const r = await db.sel('pt_noites', { select: 'dia', ativa: 'eq.true' }); extras = new Set((r || []).map((x) => x.dia)); } catch (e) { /* sem calendário: só as noites normais */ }
   const dec = decidirModo(agora, extras);
   if (dec.modo === 'off') return { modo: 'off' };
-  if (dec.modo === 'standby' && agora.minuto !== 0) return { modo: 'standby', pulou: true }; // standby: 1 leitura por hora
+  if (dec.modo === 'standby' && agora.minuto % 30 !== 0) return { modo: 'standby', pulou: true }; // standby: 1 leitura a cada 30 min
 
   // trava simples: se a leitura anterior ainda não terminou (menos de 90 s), esta passa a vez
   const chave = 'trava_coleta';
