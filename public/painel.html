@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Bosque · painel ao vivo</title>
+<link rel="icon" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F3E9; --surface1: #FFFDF7; --border: #E1D8C0;
+    --text-primary: #1B3A1E; --text-secondary: #55624C; --text-muted: #8C8468; --teal: #2B4E2F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 480px; margin-left: auto; margin-right: auto;
+  }
+  .brandbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .brandbar img { width: 34px; height: auto; border-radius: 50%; flex-shrink: 0; }
+  .brandbar span { font-size: 12px; color: var(--text-muted); }
+  h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 20px; margin: 0 0 4px; }
+  p.sub { font-size: 12px; color: var(--text-muted); margin: 0 0 20px; }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin: 16px 0 6px; }
+  input {
+    width: 100%; background: var(--surface1); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text-primary); padding: 12px; font-size: 14px; font-family: monospace;
+  }
+  button {
+    width: 100%; background: var(--teal); color: var(--bg); border: none; border-radius: 10px;
+    padding: 14px; font-size: 15px; font-weight: 600; margin-top: 24px;
+  }
+  button:disabled { opacity: 0.5; }
+  #status { font-size: 13px; margin-top: 12px; text-align: center; min-height: 18px; color: var(--text-secondary); }
+
+  .fontes { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .fonte { font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text-secondary); background:var(--surface1); }
+  .fonte.velha { border-color:#B3261E; color:#B3261E; background:#FDECEA; }
+  .fonte.erro { border-color:#B98A2E; color:#8A6420; background:#FBF1DC; }
+  .avisos { font-size:11px; color:var(--text-muted); margin:0 0 10px; }
+</style>
+</head>
+<body>
+  <div class="brandbar"><img src="/logo.png" alt="Bosque"><span>bosque. · painel ao vivo</span></div>
+  <div class="header">
+    <div><h1 id="nome-evento">Carregando…</h1><p id="atualizado">carregando...</p></div>
+    <a class="nav-link" id="nav-link" href="#"></a>
+  </div>
+  <div id="conteudo"></div>
+<script>
+const P = new URLSearchParams(location.search);
+const CHAVE = P.get('chave') || '';
+const NOITE = P.get('noite') || '';
+const HISTORICO = P.get('historico') === '1';
+let HOJE = '';
+const NOMES_FONTE = { sympla: 'Sympla', zig_ingressos: 'Porta', zig_bar: 'Bar', ugo: 'Lista' };
+const LIMITE_VELHA_MS = 3 * 60000;
+
+function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function irPara(params) {
+  const q = new URLSearchParams();
+  if (CHAVE) q.set('chave', CHAVE);
+  Object.keys(params).forEach(function (k) { if (params[k]) q.set(k, params[k]); });
+  location.href = location.pathname + (q.toString() ? '?' + q.toString() : '');
+}
+function configurarNav() {
+  const nav = document.getElementById('nav-link');
+  if (HISTORICO) { nav.textContent = '← Ao vivo'; nav.onclick = function (e) { e.preventDefault(); irPara({}); }; }
+  else if (NOITE && NOITE !== HOJE) { nav.textContent = '← Eventos passados'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
+  else { nav.textContent = 'Eventos passados'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
+}
+function renderizarLista(lista) {
+  document.getElementById('nome-evento').textContent = 'Eventos passados';
+  document.getElementById('atualizado').textContent = (lista ? lista.length : 0) + ' evento(s)';
+  const c = document.getElementById('conteudo');
+  if (!lista || !lista.length) { c.innerHTML = '<div class="empty">Nenhum evento encontrado ainda.</div>'; return; }
+  c.innerHTML = lista.map(function (i) {
+    return '<a class="item-lista" href="#" data-data="' + esc(i.data) + '"><p class="nome">' + esc(i.evento || i.data) + '</p><p class="data">' + esc(i.data) + '</p></a>';
+  }).join('');
+  Array.prototype.forEach.call(c.querySelectorAll('.item-lista'), function (el) {
+    el.onclick = function (e) { e.preventDefault(); irPara({ noite: el.getAttribute('data-data') }); };
+  });
+}
+function htmlFontes(fontes, noiteAoVivo) {
+  if (!fontes) return '';
+  return '<div class="fontes">' + Object.keys(NOMES_FONTE).map(function (k) {
+    const f = fontes[k];
+    if (!f) return '<span class="fonte erro">' + NOMES_FONTE[k] + ': sem leitura</span>';
+    let cls = 'fonte', txt = NOMES_FONTE[k] + ' ' + tempoRelativo(f.atualizado_em);
+    if (f.erro) { cls += ' erro'; txt += ' · falha na última leitura'; }
+    else if (noiteAoVivo && f.atualizado_em && Date.now() - new Date(f.atualizado_em).getTime() > LIMITE_VELHA_MS) cls += ' velha';
+    return '<span class="' + cls + '">' + txt + '</span>';
+  }).join('') + '</div>';
+}
+function renderizar(d, hoje, noite) {
+  const conteudo = document.getElementById('conteudo');
+  if (!d) { conteudo.innerHTML = '<div class="empty">Sem dados ainda para esse evento.</div>'; return; }
+  const aoVivo = noite === hoje;
+  document.getElementById('nome-evento').textContent = d.evento || 'Bosque · painel ao vivo';
+  document.getElementById('atualizado').textContent = aoVivo ? 'Atualizado ' + tempoRelativo(d.atualizado_em) : 'Última atualização registrada: ' + tempoRelativo(d.atualizado_em);
+
+  const bilhTotal = Number(d.bilheteria_total) || 0, bilhSympla = Number(d.bilheteria_sympla) || 0;
+  const feminino = Number(d.na_casa_feminino) || 0, masculino = Number(d.na_casa_masculino) || 0;
+  const totalGenero = feminino + masculino;
+  const pctFem = totalGenero ? Math.round((feminino / totalGenero) * 100) : 0;
+  const pctMasc = totalGenero ? (100 - pctFem) : 0;
+  const listaNomes = Number(d.lista_convidados) || 0, listaEntraram = Number(d.lista_entraram) || 0;
+  const pctConversaoLista = listaNomes ? (Math.round((listaEntraram / listaNomes) * 1000) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0';
+  const cvF = Number(d.cortesia_validada_feminino) || 0, cvM = Number(d.cortesia_validada_masculino) || 0, cvS = Number(d.cortesia_validada_sem_genero) || 0;
+  const cvTotal = cvF + cvM + cvS;
+  const naCasa = Number(d.pessoas_na_casa) || 0;
+  const tmBilheteria = naCasa ? bilhTotal / naCasa : 0;
+  const tmBar = naCasa ? (Number(d.faturamento_bar_recebido) || 0) / naCasa : 0;
+  const cardBilheteria = '<div class="card"><p class="label">Bilheteria</p><p class="b-val">' + fmtMoeda(bilhTotal) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(tmBilheteria) + '</b><span>por pessoa na casa</span></p></div>';
+  const cardBar = '<div class="card"><p class="label">Bar</p><p class="b-val">' + fmtMoeda(d.faturamento_bar_recebido) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(tmBar) + '</b><span>por pessoa na casa</span></p></div>';
+  const mapaEntradas = parseMapaHora(d.entradas_por_hora);
+  const mapaConsumo = parseMapaHora(d.consumo_por_hora);
+  const graficos = (mapaEntradas ? htmlGrafico('Horário de entrada', mapaEntradas, '#2B4E2F', '#1B3A1E', 'qtd') : '') +
+    (mapaConsumo ? htmlGrafico('Consumo do bar por hora', mapaConsumo, '#B98A2E', '#8A6420', 'moeda') : '');
+
+  conteudo.innerHTML =
+    (!aoVivo ? '<span class="badge-passado">Evento passado</span>' : '') +
+    htmlFontes(d.fontes, aoVivo) +
+    '<div class="card"><div class="b-hero">' +
+      '<div><p class="label">Na casa</p><p class="b-big">' + fmt(d.pessoas_na_casa) + '</p></div>' +
+      '<div class="r"><p class="label">Falta entrar</p><b>' + fmt(d.falta_entrar_antecipado) + '</b></div></div>' +
+    '<div class="b-chips">' +
+      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
+      '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
+      '<div class="b-chip">Cortesia<b>' + fmt(cvTotal) + '</b></div></div></div>' +
+    '<div class="grid-2">' + cardBilheteria + cardBar + '</div>' +
+    '<div class="card-outline"><p class="b-st">Gênero</p>' +
+      '<div class="bar"><div class="bar-pink" style="width:' + pctFem + '%"></div><div class="bar-blue" style="width:' + pctMasc + '%"></div></div>' +
+      '<div class="b-pc"><span><span class="dot" style="background:var(--pink)"></span>Feminino ' + pctFem + '%</span><span><span class="dot" style="background:var(--blue)"></span>Masculino ' + pctMasc + '%</span></div>' +
+      '<table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
+      '<tr><td>Na casa</td><td class="n">' + fmt(feminino) + '</td><td class="n">' + fmt(masculino) + '</td></tr>' +
+      '<tr><td>Cortesia validada</td><td class="n">' + fmt(cvF) + '</td><td class="n">' + fmt(cvM) + '</td></tr>' +
+      '<tr><td>Falta entrar (antecipado)</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table>' +
+      (cvS ? '<p class="b-nota">+ ' + fmt(cvS) + ' cortesia sem gênero identificado</p>' : '') + '</div>' +
+    (listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table">' +
+      '<tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' +
+      '<tr><td>Entraram</td><td class="n">' + fmt(listaEntraram) + '</td></tr>' +
+      '<tr><td>Conversão</td><td class="n"><strong>' + pctConversaoLista + '%</strong></td></tr></table></div>' : '') +
+    graficos;
+}
+
+// ---- gráficos por hora (entrada e consumo) ----
+function parseMapaHora(txt) {
+  if (!txt) return null;
+  try {
+    const o = typeof txt === 'string' ? JSON.parse(txt) : txt;
+    const total = Object.keys(o).reduce(function (a, k) { return a + (Number(o[k]) || 0); }, 0);
+    return total > 0 ? o : null;
+  } catch (e) { return null; }
+}
+function fmtK(v) { return v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + 'k' : String(v); }
+// horas ordenadas a partir das 18h (a noite vira o dia); mostra no mínimo 20h–03h
+function horasDoGrafico(mapa) {
+  const pos = function (h) { return (Number(h) - 18 + 24) % 24; };
+  const ps = Object.keys(mapa).filter(function (h) { return Number(mapa[h]) > 0; }).map(pos);
+  const ini = Math.min.apply(null, ps.concat([2]));
+  const fim = Math.max.apply(null, ps.concat([9]));
+  const horas = [];
+  for (let p = ini; p <= fim; p++) {
+    const h = (p + 18) % 24;
+    horas.push((h < 10 ? '0' : '') + h);
+  }
+  return horas;
+}
+function htmlGrafico(titulo, mapa, cor, corPico, tipo) {
+  const horas = horasDoGrafico(mapa);
+  const vals = horas.map(function (h) { return Number(mapa[h]) || 0; });
+  const max = Math.max.apply(null, vals);
+  const total = vals.reduce(function (a, b) { return a + b; }, 0);
+  const iPico = vals.indexOf(max);
+  const fmtV = tipo === 'moeda' ? fmtK : function (v) { return String(v); };
+  const colunas = horas.map(function (h, i) {
+    const alt = Math.max(3, Math.round((vals[i] / max) * 110));
+    const pico = i === iPico;
+    return '<div class="g-col"><span class="g-v' + (pico ? ' pk' : '') + '">' + (vals[i] ? fmtV(vals[i]) : '') + '</span>' +
+      '<div class="g-b" style="height:' + alt + 'px;background:' + (pico ? corPico : cor) + '"></div>' +
+      '<span class="g-h">' + h + 'h</span></div>';
+  }).join('');
+  const picoTxt = tipo === 'moeda'
+    ? 'Pico <b>' + horas[iPico] + 'h</b> · ' + fmtMoeda(max)
+    : 'Pico <b>' + horas[iPico] + 'h</b> · ' + fmt(max) + ' entradas';
+  const totalTxt = tipo === 'moeda' ? fmtMoeda(total) : fmt(total);
+  return '<div class="card-outline"><p class="b-st">' + titulo + '</p>' +
+    '<div class="g-kpis"><span>' + picoTxt + '</span><span>Total <b>' + totalTxt + '</b></span></div>' +
+    '<div class="g-chart">' + colunas + '</div></div>';
+}
+
+function fmt(n) { return (Number(n) || 0).toLocaleString('pt-BR'); }
+function fmtMoeda(n) {
+  return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function tempoRelativo(iso) {
+  if (!iso) return 'agora';
+  const diffMin = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diffMin < 1) return 'agora mesmo';
+  if (diffMin === 1) return 'há 1 min';
+  return 'há ' + diffMin + ' min';
+}
+
+
+async function carregar() {
+  const q = '?chave=' + encodeURIComponent(CHAVE);
+  try {
+    if (HISTORICO) {
+      const r = await (await fetch('/api/noites' + q, { cache: 'no-store' })).json();
+      if (r.erro) throw new Error(r.erro);
+      renderizarLista(r.noites);
+    } else {
+      const r = await (await fetch('/api/painel' + q + (NOITE ? '&noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' })).json();
+      if (r.erro) throw new Error(r.erro);
+      HOJE = r.hoje; configurarNav();
+      renderizar(r.painel, r.hoje, r.noite);
+    }
+  } catch (e) {
+    document.getElementById('conteudo').innerHTML = '<div class="empty">Não consegui carregar agora (' + esc(e.message) + '). Tentando de novo em instantes.</div>';
+  }
+}
+configurarNav();
+carregar();
+if (!HISTORICO) setInterval(carregar, 30000);
+</script>
+</body>
+</html>

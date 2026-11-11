@@ -5,6 +5,7 @@ import { coletarSympla } from './fontes/sympla.js';
 import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
+import { coletarNoite, rodarAgendado, agoraBR, decidirModo } from './coletor.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -78,16 +79,61 @@ async function teste(url, env) {
   } catch (e) { return json({ erro: String(e && e.message || e), segundos: Math.round((Date.now() - t0) / 100) / 10 }, 500); }
 }
 
+// API da tela (por enquanto protegida pela chave de teste; na Etapa 4 passa a usar link pessoal + PIN).
+async function noiteAtual(db) {
+  let extras = new Set();
+  try { const r = await db.sel('pt_noites', { select: 'dia', ativa: 'eq.true' }); extras = new Set((r || []).map((x) => x.dia)); } catch (e) { /* sem calendário */ }
+  const agora = agoraBR();
+  const dec = decidirModo(agora, extras);
+  if (dec.modo !== 'off') return dec.dia;
+  const ult = await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 1 });
+  return (ult && ult[0] && ult[0].noite) || agora.dia;
+}
+async function api(url, env) {
+  if (!chaveOk(url, env)) return json({ erro: 'Acesso negado.' }, 403);
+  const db = criarDb(env);
+  try {
+    if (url.pathname === '/api/noites') {
+      const r = await db.sel('pt_painel', { select: 'noite,evento:dados->>evento', order: 'noite.desc', limit: 200 });
+      return json({ noites: (r || []).map((x) => ({ data: x.noite, evento: x.evento || '' })) });
+    }
+    if (url.pathname === '/api/painel') {
+      const hoje = await noiteAtual(db);
+      const noite = url.searchParams.get('noite') || hoje;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(noite)) return json({ erro: 'Noite inválida.' }, 400);
+      const r = await db.sel('pt_painel', { select: 'dados', noite: 'eq.' + noite });
+      return json({ hoje, noite, painel: (r && r[0] && r[0].dados) || null });
+    }
+    return json({ erro: 'Rota desconhecida.' }, 404);
+  } catch (e) { return json({ erro: String(e && e.message || e) }, 500); }
+}
+
+// /teste/coletar?dia=AAAA-MM-DD: lê as 4 fontes dessa noite agora e consolida (para conferir noites passadas contra o painel antigo).
+async function testeColetar(url, env) {
+  if (!chaveOk(url, env)) return json({ erro: 'Acesso negado.' }, 403);
+  const dia = url.searchParams.get('dia') || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return json({ erro: 'Use ?dia=AAAA-MM-DD' }, 400);
+  const t0 = Date.now();
+  try {
+    const r = await coletarNoite(env, criarDb(env), dia, { forcar: true });
+    return json({ dia, resultados: r.resultados, segundos: Math.round((Date.now() - t0) / 100) / 10 });
+  } catch (e) { return json({ erro: String(e && e.message || e) }, 500); }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/saude') return json(await saude(env));
+    if (url.pathname === '/teste/coletar') return testeColetar(url, env);
     if (url.pathname.startsWith('/teste/')) return teste(url, env);
+    if (url.pathname.startsWith('/api/')) return api(url, env);
     return env.ASSETS.fetch(request);
   },
 
-  // A cada minuto. Etapa 2 em diante: decide se é horário de evento e coleta as fontes.
+  // A cada minuto: decide se é horário de evento e lê as fontes (cada uma separada, com o último dado bom guardado).
   async scheduled(event, env, ctx) {
-    // base: nada a coletar ainda
+    ctx.waitUntil((async () => {
+      try { await rodarAgendado(env, criarDb(env)); } catch (e) { console.log('coleta falhou: ' + (e && e.message || e)); }
+    })());
   }
 };
