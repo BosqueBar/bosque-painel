@@ -26,3 +26,23 @@ export async function sha256(txt) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(txt)));
   return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
+
+// Soma dias a uma data AAAA-MM-DD (sem depender do fuso do servidor).
+export function somarDias(dia, n) {
+  const [a, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10);
+}
+// Dia da semana de uma data AAAA-MM-DD: 0 = domingo … 6 = sábado.
+export function diaSemana(dia) {
+  const [a, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+}
+// Recebe um horário local (AAAA-MM-DDTHH:mm…) e devolve 'HH' se cair na noite `dia` (18h do dia até 06h do seguinte); senão null.
+export function horaDaNoite(iso, dia) {
+  const t = String(iso || '');
+  if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}/.test(t) || !dia) return null;
+  const d = t.substring(0, 10), h = t.substring(11, 13);
+  if (d === dia && h >= '18') return h;
+  if (d === somarDias(dia, 1) && h < '06') return h;
+  return null;
+}

@@ -2,6 +2,7 @@
 // Esta é a base: só confere se o app e o banco estão de pé. Coleta, painel e acessos entram nas próximas etapas.
 import { criarDb } from './db.js';
 import { coletarSympla } from './fontes/sympla.js';
+import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -50,6 +51,11 @@ async function teste(url, env) {
       resto.emails_cortesia_lidos = (hash_emails_cortesia || []).length;
       resto.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(resto);
+    }
+    if (fonte === 'zig_ingressos') {
+      const r = await coletarZigIngressos(env, dia);
+      r.segundos = Math.round((Date.now() - t0) / 100) / 10;
+      return json(r);
     }
     return json({ erro: 'Fonte desconhecida.' }, 404);
   } catch (e) { return json({ erro: String(e && e.message || e), segundos: Math.round((Date.now() - t0) / 100) / 10 }, 500); }
