@@ -3,6 +3,7 @@ import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinVa
   pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
+import { converterLinha } from './historico.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -153,6 +154,21 @@ async function admin(request, url, env, db, p) {
       await db.ins('pt_config', todos.map((x) => ({ chave: 'pinprov_' + x.id, valor: '1', atualizado_em: new Date().toISOString() })), { upsert: true, conflito: 'chave' });
     }
     return json({ ok: true, total: todos.length });
+  }
+  if (rota === 'historico' && request.method === 'POST') {
+    const linhas = (Array.isArray(b.linhas) ? b.linhas : []).slice(0, 500);
+    if (!linhas.length) throw new Error('Nenhuma linha para importar.');
+    const { hoje, agora } = await noiteAtual(db);
+    const ref = hoje || somarDias(agora, -1);
+    const itens = [], puladas = [];
+    for (const l of linhas) {
+      const c = converterLinha(l || {});
+      if (!c) continue;
+      if (hoje ? c.noite >= hoje : c.noite > ref) { puladas.push(c.noite); continue; } // não mexe na noite em andamento nem nas futuras
+      itens.push({ noite: c.noite, dados: c.dados, atualizado_em: c.dados.atualizado_em || new Date().toISOString() });
+    }
+    if (itens.length) await db.ins('pt_painel', itens, { upsert: true, conflito: 'noite' });
+    return json({ ok: true, importadas: itens.length, noites: itens.map((x) => x.noite).sort(), puladas });
   }
   if (rota === 'pessoas-lote' && request.method === 'POST') {
     const lista = Array.isArray(b.pessoas) ? b.pessoas.slice(0, 100) : [];

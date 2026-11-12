@@ -192,10 +192,10 @@ function criarAdmin() {
 
 // ---------- abas ----------
 function desenhar() {
-  const abas = [['pessoas', 'Pessoas'], ['acessos', 'Quem acessa'], ['noites', 'Noites extras'], ['zig', 'Tokens da Zig'], ['saude', 'Saúde']];
+  const abas = [['pessoas', 'Pessoas'], ['acessos', 'Quem acessa'], ['noites', 'Noites extras'], ['zig', 'Tokens da Zig'], ['saude', 'Saúde'], ['historico', 'Histórico']];
   raiz.innerHTML = '<div class="abas">' + abas.map(function (a) { return '<span class="aba' + (ABA === a[0] ? ' on' : '') + '" data-aba="' + a[0] + '">' + a[1] + '</span>'; }).join('') + '</div><div id="aba"></div>';
   Array.prototype.forEach.call(raiz.querySelectorAll('.aba'), function (el) { el.onclick = function () { ABA = el.getAttribute('data-aba'); desenhar(); }; });
-  ({ pessoas: abaPessoas, acessos: abaAcessos, noites: abaNoites, zig: abaZig, saude: abaSaude })[ABA]();
+  ({ pessoas: abaPessoas, acessos: abaAcessos, noites: abaNoites, zig: abaZig, saude: abaSaude, historico: abaHistorico })[ABA]();
 }
 const el = function () { return document.getElementById('aba'); };
 
@@ -456,6 +456,49 @@ async function abaZig() {
       await chamar('POST', d === 'BAR' ? '/api/admin/zig-token' : '/api/admin/tokens-porta', d === 'BAR' ? { token: campo.value } : { dia: d, token: campo.value });
       campo.value = ''; await abaZig(); document.getElementById('tk-ok').textContent = 'Token salvo.';
     } catch (x) { document.getElementById('tk-erro').textContent = x.message; }
+  };
+}
+
+// ---------- importar histórico da planilha antiga ----------
+function lerTabela(texto) { // CSV (vírgula) ou colado do Google Sheets (tab); respeita aspas
+  const primeira = texto.split(/\r?\n/)[0] || '';
+  const sep = primeira.indexOf('\t') >= 0 ? '\t' : ',';
+  const linhas = []; let cel = '', lin = [], asp = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (asp) { if (c === '"') { if (texto[i + 1] === '"') { cel += '"'; i++; } else asp = false; } else cel += c; }
+    else if (c === '"' && cel === '') asp = true;
+    else if (c === sep) { lin.push(cel); cel = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && texto[i + 1] === '\n') i++; lin.push(cel); cel = ''; if (lin.some(function (x) { return x !== ''; })) linhas.push(lin); lin = []; }
+    else cel += c;
+  }
+  lin.push(cel); if (lin.some(function (x) { return x !== ''; })) linhas.push(lin);
+  if (linhas.length < 2) return [];
+  const cab = linhas[0].map(function (x) { return x.trim(); });
+  return linhas.slice(1).map(function (l) { const o = {}; cab.forEach(function (k, i) { if (k) o[k] = (l[i] || '').trim(); }); return o; }).filter(function (o) { return /\d/.test(o.data || ''); });
+}
+function abaHistorico() {
+  el().innerHTML = '<div class="card"><p class="b-st">Trazer o histórico da planilha antiga</p>' +
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0">Na planilha <b>BOSQUE_BAR_Dashboard</b> (aba Painel_Consolidado): selecione tudo (Ctrl+A), copie (Ctrl+C) e cole abaixo, ou baixe como CSV e escolha o arquivo. A primeira linha tem que ser o cabeçalho. Noites que já existem aqui são substituídas pelas da planilha (a planilha tem a porta das noites passadas, que o app novo não consegue reler). A noite de hoje e as futuras não são mexidas.</p>' +
+    '<label class="l">Arquivo CSV</label><input type="file" id="h-arq" accept=".csv,.tsv,.txt">' +
+    '<label class="l">ou cole aqui</label><textarea id="h-txt" rows="6" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12px;font-family:monospace" placeholder="Cole aqui"></textarea>' +
+    '<div id="h-prev"></div><p class="erro" id="h-erro"></p><p class="ok" id="h-ok"></p><button class="bt" id="h-btn" disabled>Importar</button></div>';
+  let linhas = [];
+  const prev = document.getElementById('h-prev'), btn = document.getElementById('h-btn');
+  function prever(texto) {
+    linhas = lerTabela(texto);
+    prev.innerHTML = linhas.length ? '<p style="font-size:13px;margin:10px 0 0"><b>' + linhas.length + '</b> noite(s) encontradas: ' + esc(linhas[0].data) + ' até ' + esc(linhas[linhas.length - 1].data) + '</p>' : '<p style="font-size:13px;color:var(--text-muted);margin:10px 0 0">Nada reconhecido ainda (confira se colou o cabeçalho junto).</p>';
+    btn.disabled = !linhas.length;
+  }
+  document.getElementById('h-txt').oninput = function () { prever(this.value); };
+  document.getElementById('h-arq').onchange = function () { const f = this.files[0]; if (!f) return; const r = new FileReader(); r.onload = function () { document.getElementById('h-txt').value = ''; prever(String(r.result)); }; r.readAsText(f, 'utf-8'); };
+  btn.onclick = async function () {
+    btn.disabled = true; btn.textContent = 'Importando…'; document.getElementById('h-erro').textContent = ''; document.getElementById('h-ok').textContent = '';
+    try {
+      const j = await chamar('POST', '/api/admin/historico', { linhas: linhas });
+      document.getElementById('h-ok').textContent = j.importadas + ' noite(s) importadas' + (j.puladas.length ? ' · puladas (hoje/futuras): ' + j.puladas.join(', ') : '') + '. Veja em Painel → Eventos.';
+    } catch (e) { document.getElementById('h-erro').textContent = e.message; }
+    btn.disabled = false; btn.textContent = 'Importar';
   };
 }
 
