@@ -148,7 +148,14 @@ function dataBR(iso) { return iso ? iso.split('-').reverse().join('/') : ''; }
 function quando(iso) { if (!iso) return 'nunca'; const d = new Date(iso); return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); }
 function minutos(iso) { if (!iso) return null; return Math.round((Date.now() - new Date(iso).getTime()) / 60000); }
 function copiar(txt, btn) { navigator.clipboard.writeText(txt).then(function () { if (btn) { const o = btn.textContent; btn.textContent = 'Copiado!'; setTimeout(function () { btn.textContent = o; }, 1500); } }); }
-function zap(txt) { return 'https://wa.me/?text=' + encodeURIComponent(txt); }
+function zap(txt) { return 'https://api.whatsapp.com/send?text=' + encodeURIComponent(txt); }
+// No celular abre a folha de compartilhar (WhatsApp aparece na lista); no computador abre o WhatsApp Web/aplicativo.
+document.addEventListener('click', function (e) {
+  const a = e.target.closest && e.target.closest('a[href^="https://api.whatsapp.com/send"]');
+  if (!a) return;
+  const txt = decodeURIComponent(a.getAttribute('href').split('text=')[1] || '');
+  if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { e.preventDefault(); navigator.share({ text: txt }).catch(function () {}); }
+});
 
 // ---------- início: sessão ou criação do acesso da administradora ----------
 async function iniciar() {
@@ -229,7 +236,7 @@ function caixaAcesso(nome, link, pin, titulo) {
   return '<div class="caixa"><b style="margin-top:0">' + esc(titulo) + '</b>' +
     '<b>Link</b>' + esc(link) + (pin ? '<b>PIN provisório</b><span class="grande">' + esc(pin) + '</span>' : '') +
     '<div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msgAcesso(nome, link, pin)) + '">Encaminhar por WhatsApp</a>' +
-    '<button class="bt sec peq" data-copiar="' + esc(link) + '">Copiar link</button></div>' +
+    '<button class="bt sec peq" data-copiar="' + esc(msgAcesso(nome, link, pin)) + '">Copiar mensagem</button></div>' +
     '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">' + (pin ? 'No primeiro acesso a pessoa troca o PIN provisório pelo próprio. ' : '') + 'O link é fixo e você pode reenviá-lo quando quiser em "Ver / reenviar link".</p></div>';
 }
 async function acaoPessoa(ev) {
@@ -346,7 +353,7 @@ function formLote() {
       const html = '<div class="caixa"><b style="margin-top:0">' + certos.length + ' cadastrada(s). Toque em <b>Encaminhar por WhatsApp</b> em cada linha: vai uma mensagem só, com o link e o PIN provisório (cada um escolhe o seu PIN no primeiro acesso):</b>' +
         '<table class="t">' + j.resultados.map(function (x) {
           if (!x.ok) return '<tr><td>' + esc(x.nome) + '</td><td><span class="chip verm">' + esc(x.erro) + '</span></td></tr>';
-          return '<tr><td>' + esc(x.nome) + '</td><td style="text-align:right"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msgAcesso(x.nome, x.link, x.pin)) + '">Encaminhar por WhatsApp</a></td></tr>';
+          return '<tr><td>' + esc(x.nome) + '</td><td style="text-align:right"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msgAcesso(x.nome, x.link, x.pin)) + '">Encaminhar por WhatsApp</a> <button class="bt sec peq" data-copiar="' + esc(msgAcesso(x.nome, x.link, x.pin)) + '">Copiar</button></td></tr>';
         }).join('') + '</table><p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Depois, o link de cada pessoa fica em Pessoas → Ver / reenviar link.</p></div>';
       await abaPessoasRecarrega(html);
     } catch (e) { document.getElementById('l-erro').textContent = e.message; btn.disabled = false; btn.textContent = 'Cadastrar'; }
