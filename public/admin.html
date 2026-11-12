@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<title>Administração · Painel Bosque</title>
+<style>
+  :root {
+    --bg: #F7F3E9; --surface1: #FFFDF7; --surface2: #FBF7EC; --border: #E1D8C0;
+    --text-primary: #1B3A1E; --text-secondary: #55624C; --text-muted: #8C8468;
+    --teal: #2B4E2F; --coral: #B98A2E; --pink: #8B4049; --blue: #2C5F5A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 760px; margin-left: auto; margin-right: auto;
+  }
+  a { color: inherit; text-decoration: none; }
+  .brandbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .brandbar img { width: 34px; height: auto; border-radius: 50%; flex-shrink: 0; }
+  .brandbar span { font-size: 12px; letter-spacing: 0.02em; color: var(--text-muted); }
+  .header { margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .header h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; margin: 0; color: var(--text-primary); }
+  .header p { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; }
+  .nav-link { font-size: 12px; color: var(--teal); white-space: nowrap; padding: 6px 12px;
+    border: 1px solid var(--teal); border-radius: 999px; }
+  .card { background: var(--surface1); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .card-outline { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+  .label { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+  .value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 26px; margin: 0; color: var(--text-primary); }
+  .sub-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .sub-row strong { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .section-title { font-size: 12px; color: var(--text-secondary); margin: 0 0 10px; }
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 8px; background: var(--border); }
+  .bar-teal { background: var(--teal); } .bar-coral { background: var(--coral); }
+  .bar-pink { background: var(--pink); } .bar-blue { background: var(--blue); }
+  .legend { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; }
+  table { width: 100%; font-size: 12px; border-collapse: collapse; color: var(--text-secondary); }
+  td { padding: 3px 0; }
+  .td-right { text-align: right; }
+  .muted { color: var(--text-muted); }
+  .empty { text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 14px; }
+  .item-lista { display: block; background: var(--surface1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 8px; }
+  .item-lista .nome { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15px; margin: 0 0 2px; color: var(--text-primary); }
+  .item-lista .data { font-size: 12px; color: var(--text-muted); margin: 0; }
+  .badge-passado { display: inline-block; font-size: 11px; color: var(--coral);
+    border: 1px solid var(--coral); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+  /* layout B */
+  .b-hero { display: flex; justify-content: space-between; align-items: flex-end; }
+  .b-hero .r { text-align: right; }
+  .b-hero .r b { display: block; font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 700; color: var(--text-primary); }
+  .b-big { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 44px; line-height: 1; margin: 0; color: var(--text-primary); }
+  .b-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .b-chip { font-size: 11px; color: var(--text-muted); }
+  .b-chip b { display: block; font-size: 15px; color: var(--text-primary); margin-top: 2px; }
+  .b-chip em { font-style: normal; font-weight: 400; font-size: 11px; color: var(--text-muted); }
+  .b-val { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 24px; margin: 0; color: var(--text-primary); }
+  .b-tm { font-size: 12px; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-secondary); }
+  .b-tm b { color: var(--text-primary); }
+  .b-tm span { display: block; font-size: 11px; color: var(--text-muted); }
+  .b-st { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 0 0 10px; }
+  .b-pc { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+  .b-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text-secondary); }
+  .b-table th { font-size: 11px; font-weight: 600; color: var(--text-muted); text-align: right; padding: 5px 0; }
+  .b-table th:first-child { text-align: left; }
+  .b-table td { padding: 5px 0; }
+  .b-table td.n { text-align: right; color: var(--text-primary); }
+  .b-table tr + tr td { border-top: 1px solid #EFE7D2; }
+  .b-nota { font-size: 11px; color: var(--text-muted); margin: 8px 0 0; }
+  .g-kpis { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin: 0 0 4px; }
+  .g-kpis b { color: var(--text-primary); }
+  .g-chart { display: flex; align-items: flex-end; gap: 6px; height: 150px; margin-top: 6px; }
+  .g-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; }
+  .g-col .g-b { width: 100%; border-radius: 5px 5px 2px 2px; min-height: 3px; }
+  .g-col .g-v { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; }
+  .g-col .g-v.pk { color: var(--text-primary); font-weight: 700; }
+  .g-col .g-h { font-size: 10px; color: var(--text-muted); margin-top: 5px; }
+  .fontes { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .fonte { font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text-secondary); background:var(--surface1); }
+  .fonte.velha { border-color:#B3261E; color:#B3261E; background:#FDECEA; }
+  .fonte.erro { border-color:#B98A2E; color:#8A6420; background:#FBF1DC; }
+  .avisos { font-size:11px; color:var(--text-muted); margin:0 0 10px; }
+
+  input, select { width:100%; background:var(--surface1); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); padding:12px; font-size:15px; font-family:inherit; }
+  label.l { display:block; font-size:13px; color:var(--text-secondary); margin:14px 0 6px; }
+  button.bt { background:var(--teal); color:var(--bg); border:none; border-radius:10px; padding:12px 16px; font-size:14px; font-weight:600; cursor:pointer; }
+  button.bt.sec { background:transparent; color:var(--teal); border:1px solid var(--teal); }
+  button.bt.peq { padding:7px 12px; font-size:12px; }
+  button.bt.perigo { background:transparent; color:#B3261E; border:1px solid #B3261E; }
+  button.bt:disabled { opacity:.5; }
+  .erro { color:#B3261E; font-size:13px; margin:10px 0 0; min-height:18px; }
+  .ok { color:var(--teal); font-size:13px; margin:10px 0 0; }
+
+  .abas { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 14px; }
+  .aba { font-size:13px; padding:7px 13px; border:1px solid var(--border); border-radius:999px; background:var(--surface1); color:var(--text-secondary); cursor:pointer; }
+  .aba.on { background:var(--teal); color:var(--bg); border-color:var(--teal); }
+  .pess { background:var(--surface1); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; }
+  .pess h3 { font-family:'Fraunces',serif; font-size:16px; margin:0 0 2px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
+  .chip { font-size:11px; padding:3px 9px; border-radius:999px; background:var(--surface2); border:1px solid var(--border); color:var(--text-secondary); }
+  .chip.verde { background:#E4EFE2; color:var(--teal); border-color:#BCD3B8; }
+  .chip.verm { background:#FDECEA; color:#B3261E; border-color:#F0BFBA; }
+  .acoes { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .dias { display:flex; flex-wrap:wrap; gap:8px; }
+  .dias label, .perms label { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text-secondary); }
+  .dias input, .perms input { width:auto; }
+  .perms { display:flex; flex-direction:column; gap:8px; }
+  .caixa { background:#FFF9E6; border:1px solid #E7D49A; border-radius:12px; padding:14px; margin:12px 0; font-size:13px; word-break:break-all; }
+  .caixa b { display:block; font-size:12px; color:var(--text-muted); margin-top:8px; }
+  .caixa .grande { font-family:monospace; font-size:22px; letter-spacing:.2em; color:var(--text-primary); }
+  table.t { width:100%; border-collapse:collapse; font-size:12px; }
+  table.t td, table.t th { padding:6px 4px; border-bottom:1px solid var(--border); text-align:left; }
+  .linha { display:flex; gap:8px; align-items:center; }
+  .linha > * { flex:1; }
+  .linha > button { flex:0 0 auto; }
+</style>
+</head>
+<body>
+  <div class="brandbar"><img src="/logo.png" alt="Bosque"><span>bosque. · administração</span></div>
+  <div class="header"><div><h1>Administração</h1><p id="quem"></p></div><a class="nav-link" href="/painel">← Painel</a></div>
+  <div id="raiz"></div>
+<script>
+const P = new URLSearchParams(location.search);
+const CHAVE = P.get('chave') || '';
+const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const raiz = document.getElementById('raiz');
+let MODELOS = {}, PESSOAS = [], ABA = 'pessoas', ONLINE = [], APARELHOS = {};
+
+function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+async function chamar(metodo, rota, corpo) {
+  const r = await fetch(rota, { method: metodo, headers: { 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined, cache: 'no-store' });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok) { const e = new Error(j.erro || 'Erro ' + r.status); e.status = r.status; throw e; }
+  return j;
+}
+function dataBR(iso) { return iso ? iso.split('-').reverse().join('/') : ''; }
+function quando(iso) { if (!iso) return 'nunca'; const d = new Date(iso); return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); }
+function minutos(iso) { if (!iso) return null; return Math.round((Date.now() - new Date(iso).getTime()) / 60000); }
+function copiar(txt, btn) { navigator.clipboard.writeText(txt).then(function () { if (btn) { const o = btn.textContent; btn.textContent = 'Copiado!'; setTimeout(function () { btn.textContent = o; }, 1500); } }); }
+function zap(txt) { return 'https://wa.me/?text=' + encodeURIComponent(txt); }
+
+// ---------- início: sessão ou criação do acesso da administradora ----------
+async function iniciar() {
+  try {
+    const eu = await chamar('GET', '/api/eu');
+    if (!eu.admin) { raiz.innerHTML = '<div class="empty">Esta área é só para a administradora.</div>'; return; }
+    document.getElementById('quem').textContent = 'Olá, ' + eu.nome;
+    desenhar();
+  } catch (e) {
+    if (e.status === 401) {
+      if (CHAVE) criarAdmin();
+      else raiz.innerHTML = '<div class="empty">Abra o seu link de administradora (o que termina com /a/…) e digite o PIN.</div>';
+    } else raiz.innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+  }
+}
+function criarAdmin() {
+  raiz.innerHTML = '<div class="card"><p class="b-st">Criar o meu acesso de administradora</p>' +
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0">Escolha um PIN de 6 números. Vou gerar o seu link pessoal; guarde-o nos favoritos. Se já existir um acesso de administradora, este passo troca o link e o PIN dele.</p>' +
+    '<label class="l">Seu nome</label><input id="a-nome" value="Annie">' +
+    '<label class="l">PIN (6 números)</label><input id="a-pin" inputmode="numeric" maxlength="6">' +
+    '<p class="erro" id="a-erro"></p><button class="bt" id="a-ok" style="width:100%">Criar meu acesso</button></div>';
+  document.getElementById('a-ok').onclick = async function () {
+    const erro = document.getElementById('a-erro'); erro.textContent = '';
+    try {
+      const j = await chamar('POST', '/api/admin/iniciar?chave=' + encodeURIComponent(CHAVE), { nome: document.getElementById('a-nome').value, pin: document.getElementById('a-pin').value.trim() });
+      raiz.innerHTML = '<div class="card"><p class="b-st">Pronto! Este é o seu link de administradora</p><div class="caixa">' + esc(j.link) + '</div>' +
+        '<p style="font-size:13px;color:var(--text-secondary)">1) Copie o link e salve nos favoritos (ele só aparece agora). 2) Abra o link e digite o seu PIN.</p>' +
+        '<button class="bt" id="a-cp">Copiar link</button> <a class="bt sec" style="text-decoration:none;display:inline-block" href="' + esc(j.link) + '">Abrir agora</a></div>';
+      document.getElementById('a-cp').onclick = function () { copiar(j.link, this); };
+    } catch (e) { erro.textContent = e.message; }
+  };
+}
+
+// ---------- abas ----------
+function desenhar() {
+  const abas = [['pessoas', 'Pessoas'], ['acessos', 'Quem acessa'], ['noites', 'Noites extras'], ['zig', 'Token da Zig'], ['saude', 'Saúde']];
+  raiz.innerHTML = '<div class="abas">' + abas.map(function (a) { return '<span class="aba' + (ABA === a[0] ? ' on' : '') + '" data-aba="' + a[0] + '">' + a[1] + '</span>'; }).join('') + '</div><div id="aba"></div>';
+  Array.prototype.forEach.call(raiz.querySelectorAll('.aba'), function (el) { el.onclick = function () { ABA = el.getAttribute('data-aba'); desenhar(); }; });
+  ({ pessoas: abaPessoas, acessos: abaAcessos, noites: abaNoites, zig: abaZig, saude: abaSaude })[ABA]();
+}
+const el = function () { return document.getElementById('aba'); };
+
+// ---------- pessoas ----------
+async function abaPessoas() {
+  el().innerHTML = '<div class="empty">Carregando…</div>';
+  const [j, ac] = await Promise.all([chamar('GET', '/api/admin/pessoas'), chamar('GET', '/api/admin/acessos')]);
+  PESSOAS = j.pessoas; MODELOS = j.modelos; ONLINE = ac.online.map(function (x) { return x.id; }); APARELHOS = ac.aparelhos_por_pessoa;
+  listaPessoas();
+}
+function resumoDias(p) {
+  const d = (p.dias || []).map(function (n) { return DIAS[n]; }).join(', ') || 'nenhum dia da semana';
+  return d + ((p.datas || []).length ? ' + ' + p.datas.map(dataBR).join(', ') : '');
+}
+function listaPessoas(extra) {
+  el().innerHTML = (extra || '') + '<div style="margin-bottom:12px"><button class="bt" data-a="nova">+ Nova pessoa</button></div>' +
+    (PESSOAS.length ? PESSOAS.map(function (p) {
+      const perms = [p.perm_contagem ? 'Contagem' : '', p.perm_bilheteria ? 'Bilheteria' : '', p.perm_bar ? 'Bar' : ''].filter(Boolean);
+      const adm = p.modelo === 'admin';
+      return '<div class="pess"><h3>' + esc(p.nome) + (ONLINE.indexOf(p.id) >= 0 ? ' <span class="chip verde">online agora</span>' : '') + '</h3>' +
+        '<div style="font-size:12px;color:var(--text-muted)">' + esc(adm ? 'Administrador' : ((MODELOS[p.modelo] || {}).rotulo || p.modelo)) + ' · ' + resumoDias(p) + (p.validade ? ' · até ' + dataBR(p.validade) : '') + '</div>' +
+        '<div class="chips">' + perms.map(function (x) { return '<span class="chip verde">' + x + '</span>'; }).join('') +
+        (p.ativo ? '' : '<span class="chip verm">desativado</span>') + (p.bloqueado ? '<span class="chip verm">bloqueado (PIN errado)</span>' : '') +
+        '<span class="chip">' + (APARELHOS[p.id] || 0) + ' aparelho(s)</span></div>' +
+        '<div class="acoes">' + (adm ? '' : '<button class="bt sec peq" data-a="editar" data-id="' + p.id + '">Editar</button>') +
+        '<button class="bt sec peq" data-a="link" data-id="' + p.id + '">Gerar novo link + PIN</button>' +
+        '<button class="bt sec peq" data-a="pin" data-id="' + p.id + '">Trocar PIN</button>' +
+        (p.bloqueado ? '<button class="bt peq" data-a="desbloquear" data-id="' + p.id + '">Desbloquear</button>' : '') +
+        (adm ? '' : '<button class="bt sec peq" data-a="ativo" data-id="' + p.id + '">' + (p.ativo ? 'Desativar' : 'Reativar') + '</button><button class="bt perigo peq" data-a="excluir" data-id="' + p.id + '">Excluir</button>') + '</div></div>';
+    }).join('') : '<div class="empty">Ninguém cadastrado ainda.</div>');
+  el().onclick = acaoPessoa;
+}
+function caixaAcesso(nome, link, pin, titulo) {
+  const msg1 = 'Oi, ' + nome + '! Este é o seu link para o painel em tempo real do Bosque: ' + link;
+  const msg2 = 'Seu PIN de acesso ao painel do Bosque: ' + pin + ' (não compartilhe).';
+  return '<div class="caixa"><b style="margin-top:0">' + esc(titulo) + ' — guarde agora, o link não aparece de novo</b>' +
+    '<b>Link</b>' + esc(link) + '<b>PIN</b><span class="grande">' + esc(pin || '(não mudou)') + '</span>' +
+    '<div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg1) + '">1) Enviar link por WhatsApp</a>' +
+    (pin ? '<a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg2) + '">2) Enviar PIN por WhatsApp</a>' : '') +
+    '<button class="bt sec peq" data-copiar="' + esc(link) + '">Copiar link</button></div>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Mande o link e o PIN em mensagens separadas (e, de preferência, para a própria pessoa).</p></div>';
+}
+async function acaoPessoa(ev) {
+  const c = ev.target.closest('[data-copiar]'); if (c) return copiar(c.getAttribute('data-copiar'), c);
+  const b = ev.target.closest('[data-a]'); if (!b) return;
+  const a = b.getAttribute('data-a'), id = Number(b.getAttribute('data-id'));
+  const p = PESSOAS.find(function (x) { return x.id === id; });
+  try {
+    if (a === 'nova') return formPessoa(null);
+    if (a === 'editar') return formPessoa(p);
+    if (a === 'link') { if (!confirm('Gerar um link novo para ' + p.nome + '? O link antigo para de funcionar e o PIN também muda.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
+    if (a === 'pin') { if (!confirm('Trocar o PIN de ' + p.nome + '?')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-pin', {}); await abaPessoasRecarrega('<div class="caixa"><b style="margin-top:0">Novo PIN de ' + esc(p.nome) + '</b><span class="grande">' + esc(j.pin) + '</span><div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap('Seu novo PIN do painel do Bosque: ' + j.pin) + '">Enviar PIN por WhatsApp</a></div></div>'); return; }
+    if (a === 'desbloquear') { await chamar('POST', '/api/admin/pessoas/' + id + '/desbloquear', {}); return abaPessoasRecarrega(); }
+    if (a === 'ativo') { await chamar('POST', '/api/admin/pessoas/' + id + '/atualizar', { ativo: !p.ativo }); return abaPessoasRecarrega(); }
+    if (a === 'excluir') { if (!confirm('Excluir ' + p.nome + ' de vez? Isso apaga o acesso e o histórico dessa pessoa.')) return; await chamar('POST', '/api/admin/pessoas/' + id + '/excluir', {}); return abaPessoasRecarrega(); }
+  } catch (e) { alert(e.message); }
+}
+async function abaPessoasRecarrega(extra) {
+  const [j, ac] = await Promise.all([chamar('GET', '/api/admin/pessoas'), chamar('GET', '/api/admin/acessos')]);
+  PESSOAS = j.pessoas; ONLINE = ac.online.map(function (x) { return x.id; }); APARELHOS = ac.aparelhos_por_pessoa; listaPessoas(extra);
+}
+function formPessoa(p) {
+  const novo = !p;
+  const opcoes = Object.keys(MODELOS).map(function (k) { return '<option value="' + k + '"' + (p && p.modelo === k ? ' selected' : '') + '>' + esc(MODELOS[k].rotulo) + '</option>'; }).join('');
+  const dias = p ? p.dias : [];
+  let datas = p ? p.datas.slice() : [];
+  el().innerHTML = '<div class="card"><p class="b-st">' + (novo ? 'Nova pessoa' : 'Editar ' + esc(p.nome)) + '</p>' +
+    '<label class="l">Nome</label><input id="f-nome" value="' + esc(p ? p.nome : '') + '">' +
+    '<label class="l">Modelo de acesso (preenche os dias e as permissões; dá para ajustar)</label><select id="f-modelo">' + opcoes + '</select>' +
+    '<label class="l">Dias da semana liberados</label><div class="dias" id="f-dias">' + DIAS.map(function (d, i) { return '<label><input type="checkbox" value="' + i + '"' + (dias.indexOf(i) >= 0 ? ' checked' : '') + '>' + d + '</label>'; }).join('') + '</div>' +
+    '<label class="l">Datas avulsas (feriado / dia extra)</label><div class="linha"><input type="date" id="f-data"><button class="bt sec peq" id="f-add" type="button">Adicionar</button></div><div class="chips" id="f-datas"></div>' +
+    '<label class="l">O que essa pessoa vê</label><div class="perms"><label><input type="checkbox" id="f-c"> Contagem (na casa, gênero, lista, gráfico de horário de entrada)</label>' +
+    '<label><input type="checkbox" id="f-b"> Bilheteria (Sympla, porta, cortesia, valores, ticket médio)</label>' +
+    '<label><input type="checkbox" id="f-bar"> Bar (faturamento, ticket médio, gráfico de consumo)</label></div><p id="f-aviso" style="font-size:12px;color:var(--text-muted);margin:6px 0 0"></p>' +
+    '<label class="l">Vale até (opcional)</label><input type="date" id="f-val" value="' + esc(p && p.validade ? p.validade : '') + '">' +
+    (novo ? '<label class="l">PIN (opcional: se vazio, eu gero um de 6 números)</label><input id="f-pin" inputmode="numeric" maxlength="6">' : '') +
+    '<p class="erro" id="f-erro"></p><div class="acoes"><button class="bt" id="f-salvar">' + (novo ? 'Criar e gerar link' : 'Salvar') + '</button><button class="bt sec" id="f-cancela">Cancelar</button></div></div>';
+  const $ = function (i) { return document.getElementById(i); };
+  const socio = function () { return /^socios_/.test($('f-modelo').value); };
+  function perms() { $('f-bar').disabled = socio(); if (socio()) { $('f-bar').checked = false; } $('f-aviso').textContent = socio() ? 'Sócio de noite nunca vê o bar (travado).' : ''; }
+  function chipsDatas() { $('f-datas').innerHTML = datas.map(function (d) { return '<span class="chip">' + dataBR(d) + ' <a href="#" data-rm="' + d + '" style="color:#B3261E">✕</a></span>'; }).join(''); }
+  function aplicarModelo() {
+    const m = MODELOS[$('f-modelo').value]; if (!m) return;
+    Array.prototype.forEach.call($('f-dias').querySelectorAll('input'), function (i) { i.checked = m.dias.indexOf(Number(i.value)) >= 0; });
+    $('f-c').checked = m.contagem; $('f-b').checked = m.bilheteria; $('f-bar').checked = m.bar; perms();
+  }
+  if (novo) aplicarModelo(); else { $('f-c').checked = p.perm_contagem; $('f-b').checked = p.perm_bilheteria; $('f-bar').checked = p.perm_bar; perms(); }
+  chipsDatas();
+  $('f-modelo').onchange = aplicarModelo;
+  $('f-add').onclick = function () { const v = $('f-data').value; if (v && datas.indexOf(v) < 0) { datas.push(v); chipsDatas(); } $('f-data').value = ''; };
+  $('f-datas').onclick = function (e) { const r = e.target.getAttribute('data-rm'); if (r) { e.preventDefault(); datas = datas.filter(function (d) { return d !== r; }); chipsDatas(); } };
+  $('f-cancela').onclick = function () { abaPessoasRecarrega(); };
+  $('f-salvar').onclick = async function () {
+    $('f-erro').textContent = '';
+    const corpo = {
+      nome: $('f-nome').value, modelo: $('f-modelo').value,
+      dias: Array.prototype.filter.call($('f-dias').querySelectorAll('input'), function (i) { return i.checked; }).map(function (i) { return Number(i.value); }),
+      datas: datas, perm_contagem: $('f-c').checked, perm_bilheteria: $('f-b').checked, perm_bar: $('f-bar').checked, validade: $('f-val').value || null
+    };
+    try {
+      if (novo) {
+        if ($('f-pin').value.trim()) corpo.pin = $('f-pin').value.trim();
+        const j = await chamar('POST', '/api/admin/pessoas', corpo);
+        await abaPessoasRecarrega(caixaAcesso(j.pessoa.nome, j.link, j.pin, 'Acesso criado para ' + j.pessoa.nome));
+      } else { await chamar('POST', '/api/admin/pessoas/' + p.id + '/atualizar', corpo); await abaPessoasRecarrega(); }
+    } catch (e) { $('f-erro').textContent = e.message; }
+  };
+}
+
+// ---------- quem acessa ----------
+async function abaAcessos() {
+  el().innerHTML = '<div class="empty">Carregando…</div>';
+  const j = await chamar('GET', '/api/admin/acessos');
+  el().innerHTML = '<div class="card"><p class="b-st">Online agora</p>' + (j.online.length ? j.online.map(function (x) { return '<span class="chip verde">' + esc(x.nome) + '</span> '; }).join('') : '<span style="font-size:13px;color:var(--text-muted)">Ninguém com o painel aberto neste momento.</span>') + '</div>' +
+    '<div class="card-outline"><p class="b-st">Últimas entradas (login com PIN)</p><table class="t"><tr><th>Quando</th><th>Quem</th><th>Aparelho</th><th>Noite</th></tr>' +
+    j.recentes.map(function (a) { return '<tr><td>' + quando(a.em) + '</td><td>' + esc(a.pessoa) + '</td><td>' + esc(a.aparelho) + '</td><td>' + dataBR(a.noite) + '</td></tr>'; }).join('') + '</table></div>';
+}
+
+// ---------- noites extras ----------
+async function abaNoites() {
+  const j = await chamar('GET', '/api/admin/noites');
+  el().innerHTML = '<div class="card"><p class="b-st">Marcar uma noite extra</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Quinta, sexta, sábado e domingo o painel liga sozinho. Para um feriado numa segunda ou outro dia, marque aqui: ele passa a ler as fontes naquela noite (20h–05h). Depois, libere a data para as pessoas em <b>Pessoas → Datas avulsas</b>.</p>' +
+    '<label class="l">Data</label><input type="date" id="n-dia"><label class="l">Nome do evento (opcional)</label><input id="n-evento" placeholder="Ex.: BOSQUE - SEG - 16/11 (feriado)">' +
+    '<p class="erro" id="n-erro"></p><button class="bt" id="n-ok">Marcar noite</button></div>' +
+    '<div class="card-outline"><p class="b-st">Noites marcadas</p>' + (j.noites.length ? '<table class="t">' + j.noites.map(function (n) { return '<tr><td>' + dataBR(n.dia) + '</td><td>' + esc(n.evento || '') + '</td><td style="text-align:right"><button class="bt perigo peq" data-rm="' + n.dia + '">Remover</button></td></tr>'; }).join('') + '</table>' : '<span style="font-size:13px;color:var(--text-muted)">Nenhuma noite extra.</span>') + '</div>';
+  document.getElementById('n-ok').onclick = async function () {
+    try { await chamar('POST', '/api/admin/noites', { dia: document.getElementById('n-dia').value, evento: document.getElementById('n-evento').value }); abaNoites(); } catch (e) { document.getElementById('n-erro').textContent = e.message; }
+  };
+  el().onclick = async function (e) { const r = e.target.getAttribute('data-rm'); if (r && confirm('Remover a noite ' + dataBR(r) + '?')) { await chamar('POST', '/api/admin/noites/excluir', { dia: r }); abaNoites(); } };
+}
+
+// ---------- token da Zig ----------
+async function abaZig() {
+  const j = await chamar('GET', '/api/admin/fontes');
+  const t = j.token_zig, m = minutos(t.atualizado_em);
+  el().innerHTML = '<div class="card"><p class="b-st">Token da Zig (troca toda segunda)</p>' +
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">' + (t.guardado ? 'Último token colado: <b>' + quando(t.atualizado_em) + '</b>' + (m !== null && m > 60 * 24 * 6 ? ' <span class="chip verm">tem mais de 6 dias</span>' : '') : (t.variavel_antiga ? 'Nenhum token colado aqui ainda: o app está usando o token antigo da configuração do servidor.' : '<span class="chip verm">Nenhum token da Zig configurado</span>')) + '</p>' +
+    '<label class="l">Cole o token novo da Zig</label><input id="z-tok" type="password" autocomplete="off" placeholder="cole aqui o token inteiro">' +
+    '<p style="font-size:12px;color:var(--text-muted);margin:6px 0 0">Ele fica guardado criptografado e nunca é mostrado de volta. Cole na segunda, antes das 10h.</p>' +
+    '<p class="erro" id="z-erro"></p><button class="bt" id="z-ok">Salvar token</button></div>';
+  document.getElementById('z-ok').onclick = async function () {
+    const erro = document.getElementById('z-erro'); erro.textContent = '';
+    try { await chamar('POST', '/api/admin/zig-token', { token: document.getElementById('z-tok').value }); document.getElementById('z-tok').value = ''; abaZig(); }
+    catch (e) { erro.textContent = e.message; }
+  };
+}
+
+// ---------- saúde das fontes ----------
+const NOME = { sympla: 'Sympla (venda antecipada)', zig_ingressos: 'Porta (SuperTicket)', zig_bar: 'Bar (Zig)', ugo: 'Lista (UGO)' };
+async function abaSaude() {
+  const j = await chamar('GET', '/api/admin/fontes');
+  const linhas = Object.keys(NOME).map(function (k) {
+    const f = j.fontes.find(function (x) { return x.fonte === k; });
+    if (!f) return '<tr><td>' + NOME[k] + '</td><td><span class="chip verm">sem leitura</span></td><td></td></tr>';
+    const m = minutos(f.atualizado_em), velha = j.ao_vivo && (m === null || m > 3);
+    const estado = f.erro ? '<span class="chip verm">falha</span>' : (velha ? '<span class="chip verm">atrasada</span>' : '<span class="chip verde">ok</span>');
+    return '<tr><td>' + NOME[k] + '</td><td>' + estado + '</td><td>' + (m === null ? 'nunca' : 'há ' + m + ' min') + (f.erro ? '<br><span style="color:#B3261E">' + esc(f.erro) + '</span>' : '') + '</td></tr>';
+  }).join('');
+  el().innerHTML = '<div class="card"><p class="b-st">Fontes da noite ' + dataBR(j.noite) + (j.ao_vivo ? ' (ao vivo)' : ' (fora do horário de evento)') + '</p><table class="t"><tr><th>Fonte</th><th>Estado</th><th>Última leitura</th></tr>' + linhas + '</table>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Ao vivo, a fonte fica "atrasada" se passar de 3 minutos sem ler. Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>';
+}
+iniciar();
+</script>
+</body>
+</html>

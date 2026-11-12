@@ -5,7 +5,9 @@ import { coletarSympla } from './fontes/sympla.js';
 import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
-import { coletarNoite, rodarAgendado, agoraBR, decidirModo } from './coletor.js';
+import { coletarNoite, rodarAgendado } from './coletor.js';
+import { api } from './rotas.js';
+import { envComTokenZig } from './auth.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -61,7 +63,7 @@ async function teste(url, env) {
       return json(r);
     }
     if (fonte === 'zig_bar') {
-      const r = await coletarZigBar(env, dia);
+      const r = await coletarZigBar(await envComTokenZig(env, criarDb(env)), dia);
       r.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(r);
     }
@@ -77,35 +79,6 @@ async function teste(url, env) {
     }
     return json({ erro: 'Fonte desconhecida.' }, 404);
   } catch (e) { return json({ erro: String(e && e.message || e), segundos: Math.round((Date.now() - t0) / 100) / 10 }, 500); }
-}
-
-// API da tela (por enquanto protegida pela chave de teste; na Etapa 4 passa a usar link pessoal + PIN).
-async function noiteAtual(db) {
-  let extras = new Set();
-  try { const r = await db.sel('pt_noites', { select: 'dia', ativa: 'eq.true' }); extras = new Set((r || []).map((x) => x.dia)); } catch (e) { /* sem calendário */ }
-  const agora = agoraBR();
-  const dec = decidirModo(agora, extras);
-  if (dec.modo !== 'off') return dec.dia;
-  const ult = await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 1 });
-  return (ult && ult[0] && ult[0].noite) || agora.dia;
-}
-async function api(url, env) {
-  if (!chaveOk(url, env)) return json({ erro: 'Acesso negado.' }, 403);
-  const db = criarDb(env);
-  try {
-    if (url.pathname === '/api/noites') {
-      const r = await db.sel('pt_painel', { select: 'noite,evento:dados->>evento', order: 'noite.desc', limit: 200 });
-      return json({ noites: (r || []).map((x) => ({ data: x.noite, evento: x.evento || '' })) });
-    }
-    if (url.pathname === '/api/painel') {
-      const hoje = await noiteAtual(db);
-      const noite = url.searchParams.get('noite') || hoje;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(noite)) return json({ erro: 'Noite inválida.' }, 400);
-      const r = await db.sel('pt_painel', { select: 'dados', noite: 'eq.' + noite });
-      return json({ hoje, noite, painel: (r && r[0] && r[0].dados) || null });
-    }
-    return json({ erro: 'Rota desconhecida.' }, 404);
-  } catch (e) { return json({ erro: String(e && e.message || e) }, 500); }
 }
 
 // /teste/coletar?dia=AAAA-MM-DD: lê as 4 fontes dessa noite agora e consolida (para conferir noites passadas contra o painel antigo).
@@ -126,7 +99,8 @@ export default {
     if (url.pathname === '/saude') return json(await saude(env));
     if (url.pathname === '/teste/coletar') return testeColetar(url, env);
     if (url.pathname.startsWith('/teste/')) return teste(url, env);
-    if (url.pathname.startsWith('/api/')) return api(url, env);
+    if (url.pathname.startsWith('/api/')) { let db; try { db = criarDb(env); } catch (e) { return json({ erro: 'Servidor sem configuração do banco.' }, 500); } return api(request, url, env, db); }
+    if (url.pathname.startsWith('/a/')) return env.ASSETS.fetch(new Request(new URL('/entrar', url).toString(), request)); // link pessoal → tela do PIN
     return env.ASSETS.fetch(request);
   },
 

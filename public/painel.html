@@ -97,7 +97,7 @@
   <div class="brandbar"><img src="/logo.png" alt="Bosque"><span>bosque. · painel ao vivo</span></div>
   <div class="header">
     <div><h1 id="nome-evento">Carregando…</h1><p id="atualizado">carregando...</p></div>
-    <a class="nav-link" id="nav-link" href="#"></a>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><a class="nav-link" id="nav-link" href="#"></a><a class="nav-link" id="link-admin" href="/admin" style="display:none">Administração</a></div>
   </div>
   <div id="conteudo"></div>
 <script>
@@ -145,14 +145,13 @@ function htmlFontes(fontes, noiteAoVivo) {
     return '<span class="' + cls + '">' + txt + '</span>';
   }).join('') + '</div>';
 }
-function renderizar(d, hoje, noite) {
+function renderizar(d, hoje, noite, aoVivo) {
   const conteudo = document.getElementById('conteudo');
   if (!d) { conteudo.innerHTML = '<div class="empty">Sem dados ainda para esse evento.</div>'; return; }
-  const aoVivo = noite === hoje;
+  const perm = d.perm || { contagem: true, bilheteria: true, bar: true };
   document.getElementById('nome-evento').textContent = d.evento || 'Bosque · painel ao vivo';
   document.getElementById('atualizado').textContent = aoVivo ? 'Atualizado ' + tempoRelativo(d.atualizado_em) : 'Última atualização registrada: ' + tempoRelativo(d.atualizado_em);
 
-  const bilhTotal = Number(d.bilheteria_total) || 0, bilhSympla = Number(d.bilheteria_sympla) || 0;
   const feminino = Number(d.na_casa_feminino) || 0, masculino = Number(d.na_casa_masculino) || 0;
   const totalGenero = feminino + masculino;
   const pctFem = totalGenero ? Math.round((feminino / totalGenero) * 100) : 0;
@@ -160,37 +159,38 @@ function renderizar(d, hoje, noite) {
   const listaNomes = Number(d.lista_convidados) || 0, listaEntraram = Number(d.lista_entraram) || 0;
   const pctConversaoLista = listaNomes ? (Math.round((listaEntraram / listaNomes) * 1000) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0';
   const cvF = Number(d.cortesia_validada_feminino) || 0, cvM = Number(d.cortesia_validada_masculino) || 0, cvS = Number(d.cortesia_validada_sem_genero) || 0;
-  const cvTotal = cvF + cvM + cvS;
-  const naCasa = Number(d.pessoas_na_casa) || 0;
-  const tmBilheteria = naCasa ? bilhTotal / naCasa : 0;
-  const tmBar = naCasa ? (Number(d.faturamento_bar_recebido) || 0) / naCasa : 0;
-  const cardBilheteria = '<div class="card"><p class="label">Bilheteria</p><p class="b-val">' + fmtMoeda(bilhTotal) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(tmBilheteria) + '</b><span>por pessoa na casa</span></p></div>';
-  const cardBar = '<div class="card"><p class="label">Bar</p><p class="b-val">' + fmtMoeda(d.faturamento_bar_recebido) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(tmBar) + '</b><span>por pessoa na casa</span></p></div>';
-  const mapaEntradas = parseMapaHora(d.entradas_por_hora);
-  const mapaConsumo = parseMapaHora(d.consumo_por_hora);
+
+  const cardBilheteria = '<div class="card"><p class="label">Bilheteria</p><p class="b-val">' + fmtMoeda(d.bilheteria_total) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(d.ticket_medio_bilheteria) + '</b><span>por pessoa na casa</span></p></div>';
+  const cardBar = '<div class="card"><p class="label">Bar</p><p class="b-val">' + fmtMoeda(d.faturamento_bar_recebido) + '</p><p class="b-tm">Ticket médio <b>' + fmtMoeda(d.ticket_medio_bar) + '</b><span>por pessoa na casa</span></p></div>';
+  const dinheiro = (perm.bilheteria && perm.bar) ? '<div class="grid-2">' + cardBilheteria + cardBar + '</div>' : (perm.bilheteria ? cardBilheteria : (perm.bar ? cardBar : ''));
+
+  const mapaEntradas = perm.contagem ? parseMapaHora(d.entradas_por_hora) : null;
+  const mapaConsumo = perm.bar ? parseMapaHora(d.consumo_por_hora) : null;
   const graficos = (mapaEntradas ? htmlGrafico('Horário de entrada', mapaEntradas, '#2B4E2F', '#1B3A1E', 'qtd') : '') +
     (mapaConsumo ? htmlGrafico('Consumo do bar por hora', mapaConsumo, '#B98A2E', '#8A6420', 'moeda') : '');
+
+  const heroTopo = perm.contagem ? '<div class="b-hero">' +
+      '<div><p class="label">Na casa</p><p class="b-big">' + fmt(d.pessoas_na_casa) + '</p></div>' +
+      '<div class="r"><p class="label">Falta entrar</p><b>' + fmt(d.falta_entrar_antecipado) + '</b></div></div>' : '';
+  const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
+      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
+      '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
+      '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
 
   conteudo.innerHTML =
     (!aoVivo ? '<span class="badge-passado">Evento passado</span>' : '') +
     htmlFontes(d.fontes, aoVivo) +
-    '<div class="card"><div class="b-hero">' +
-      '<div><p class="label">Na casa</p><p class="b-big">' + fmt(d.pessoas_na_casa) + '</p></div>' +
-      '<div class="r"><p class="label">Falta entrar</p><b>' + fmt(d.falta_entrar_antecipado) + '</b></div></div>' +
-    '<div class="b-chips">' +
-      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
-      '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
-      '<div class="b-chip">Cortesia<b>' + fmt(cvTotal) + '</b></div></div></div>' +
-    '<div class="grid-2">' + cardBilheteria + cardBar + '</div>' +
-    '<div class="card-outline"><p class="b-st">Gênero</p>' +
+    ((heroTopo || chips) ? '<div class="card">' + heroTopo + chips + '</div>' : '') +
+    dinheiro +
+    (perm.contagem ? '<div class="card-outline"><p class="b-st">Gênero</p>' +
       '<div class="bar"><div class="bar-pink" style="width:' + pctFem + '%"></div><div class="bar-blue" style="width:' + pctMasc + '%"></div></div>' +
       '<div class="b-pc"><span><span class="dot" style="background:var(--pink)"></span>Feminino ' + pctFem + '%</span><span><span class="dot" style="background:var(--blue)"></span>Masculino ' + pctMasc + '%</span></div>' +
       '<table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
       '<tr><td>Na casa</td><td class="n">' + fmt(feminino) + '</td><td class="n">' + fmt(masculino) + '</td></tr>' +
       '<tr><td>Cortesia validada</td><td class="n">' + fmt(cvF) + '</td><td class="n">' + fmt(cvM) + '</td></tr>' +
       '<tr><td>Falta entrar (antecipado)</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table>' +
-      (cvS ? '<p class="b-nota">+ ' + fmt(cvS) + ' cortesia sem gênero identificado</p>' : '') + '</div>' +
-    (listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table">' +
+      (cvS ? '<p class="b-nota">+ ' + fmt(cvS) + ' cortesia sem gênero identificado</p>' : '') + '</div>' : '') +
+    (perm.contagem && listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table">' +
       '<tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' +
       '<tr><td>Entraram</td><td class="n">' + fmt(listaEntraram) + '</td></tr>' +
       '<tr><td>Conversão</td><td class="n"><strong>' + pctConversaoLista + '%</strong></td></tr></table></div>' : '') +
@@ -257,21 +257,33 @@ function tempoRelativo(iso) {
 
 
 async function carregar() {
-  const q = '?chave=' + encodeURIComponent(CHAVE);
+  const q = CHAVE ? '?chave=' + encodeURIComponent(CHAVE) : '?';
+  const sep = CHAVE ? '&' : '';
   try {
     if (HISTORICO) {
-      const r = await (await fetch('/api/noites' + q, { cache: 'no-store' })).json();
+      const resp = await fetch('/api/noites' + q, { cache: 'no-store' });
+      const r = await resp.json();
+      if (resp.status === 401) return semSessao(r.erro);
       if (r.erro) throw new Error(r.erro);
       renderizarLista(r.noites);
     } else {
-      const r = await (await fetch('/api/painel' + q + (NOITE ? '&noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' })).json();
+      const resp = await fetch('/api/painel' + q + (NOITE ? sep + 'noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' });
+      const r = await resp.json();
+      if (resp.status === 401) return semSessao(r.erro);
       if (r.erro) throw new Error(r.erro);
       HOJE = r.hoje; configurarNav();
-      renderizar(r.painel, r.hoje, r.noite);
+      if (r.admin && !CHAVE) { const l = document.getElementById('link-admin'); if (l) l.style.display = ''; }
+      if (r.sem_noite) { document.getElementById('nome-evento').textContent = r.nome ? 'Olá, ' + r.nome : 'Painel'; document.getElementById('atualizado').textContent = ''; document.getElementById('conteudo').innerHTML = '<div class="empty">Nenhuma noite liberada para o seu acesso por enquanto.<br>Quando for a sua noite, ela aparece aqui sozinha.</div>'; return; }
+      renderizar(r.painel, r.hoje, r.noite, !!r.ao_vivo);
     }
   } catch (e) {
     document.getElementById('conteudo').innerHTML = '<div class="empty">Não consegui carregar agora (' + esc(e.message) + '). Tentando de novo em instantes.</div>';
   }
+}
+function semSessao(msg) {
+  document.getElementById('nome-evento').textContent = 'Painel Bosque';
+  document.getElementById('atualizado').textContent = '';
+  document.getElementById('conteudo').innerHTML = '<div class="empty">' + esc(msg || 'Abra o link que você recebeu por WhatsApp e digite o seu PIN.') + '</div>';
 }
 configurarNav();
 carregar();
