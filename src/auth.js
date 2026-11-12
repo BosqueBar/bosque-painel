@@ -59,10 +59,11 @@ async function assinar(env, texto) {
   const k = await chaveDerivada(env, 'sessao', 'hmac');
   return b64u(await crypto.subtle.sign('HMAC', k, enc.encode(texto)));
 }
-export async function criarCookie(env, pessoa, https) {
+export async function criarCookie(env, pessoa, https, provisorio) {
   const exp = Math.floor(Date.now() / 1000) + DIAS_SESSAO * 86400;
-  const corpo = pessoa.id + '.' + exp + '.' + versao(pessoa);
-  const valor = pessoa.id + '.' + exp + '.' + (await assinar(env, corpo));
+  const f = provisorio ? '1' : '0'; // 1 = ainda usa o PIN provisório: só pode trocar o PIN
+  const corpo = pessoa.id + '.' + exp + '.' + f + '.' + versao(pessoa);
+  const valor = pessoa.id + '.' + exp + '.' + f + '.' + (await assinar(env, corpo));
   return COOKIE + '=' + valor + '; Path=/; Max-Age=' + DIAS_SESSAO * 86400 + '; HttpOnly; SameSite=Lax' + (https ? '; Secure' : '');
 }
 export const cookieSair = () => COOKIE + '=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax';
@@ -71,17 +72,18 @@ export const cookieSair = () => COOKIE + '=; Path=/; Max-Age=0; HttpOnly; SameSi
 export async function pessoaDaSessao(request, env, db) {
   const m = (request.headers.get('Cookie') || '').match(new RegExp('(?:^|; )' + COOKIE + '=([^;]+)'));
   if (!m) return null;
-  const [id, exp, sig] = m[1].split('.');
-  if (!id || !exp || !sig || Number(exp) < Date.now() / 1000) return null;
+  const [id, exp, f, sig] = m[1].split('.');
+  if (!id || !exp || !f || !sig || Number(exp) < Date.now() / 1000) return null;
   const r = await db.sel('pt_pessoas', { id: 'eq.' + Number(id) });
   const p = r && r[0];
   if (!p || !p.ativo) return null;
-  const esperado = await assinar(env, p.id + '.' + exp + '.' + versao(p));
+  const esperado = await assinar(env, p.id + '.' + exp + '.' + f + '.' + versao(p));
   if (esperado.length !== sig.length) return null;
   let d = 0; for (let i = 0; i < sig.length; i++) d |= esperado.charCodeAt(i) ^ sig.charCodeAt(i);
   if (d !== 0) return null;
   if (p.validade && p.validade < new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10)) return null;
   if (p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()) return null;
+  p._prov = f === '1';
   return p;
 }
 
@@ -170,4 +172,14 @@ export async function rotuloAparelho(request) {
   const so = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'Mac' : 'Outro';
   const nav = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : /Firefox\//.test(ua) ? 'Firefox' : '';
   return so + (nav ? ' · ' + nav : '') + ' · ' + (await sha256('ap|' + ua)).slice(0, 6);
+}
+
+// ---------- PIN provisório (a pessoa escolhe o próprio PIN no primeiro acesso) ----------
+export async function marcarProvisorio(db, id, sim) {
+  if (sim) await db.ins('pt_config', [{ chave: 'pinprov_' + id, valor: '1', atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
+  else await db.del('pt_config', { chave: 'eq.pinprov_' + id });
+}
+export async function ehProvisorio(db, id) {
+  const r = await db.sel('pt_config', { select: 'chave', chave: 'eq.pinprov_' + id });
+  return !!(r && r[0]);
 }

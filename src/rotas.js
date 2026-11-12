@@ -1,6 +1,6 @@
 // Rotas da tela e da administração (acesso por pessoa). Respostas em JSON; nada de dado pessoal em log.
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
-  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
+  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
@@ -77,8 +77,22 @@ async function entrar(request, env, db) {
   if (p.erros_pin) await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { erros_pin: 0 });
   const { hoje, agora } = await noiteAtual(db);
   await db.ins('pt_acessos', [{ pessoa_id: p.id, aparelho: await rotuloAparelho(request), noite: hoje || agora }]);
-  const cookie = await criarCookie(env, p, new URL(request.url).protocol === 'https:');
-  return json({ ok: true, admin: ehAdmin(p) }, 200, { 'Set-Cookie': cookie });
+  const prov = !ehAdmin(p) && (await ehProvisorio(db, p.id));
+  const cookie = await criarCookie(env, p, new URL(request.url).protocol === 'https:', prov);
+  return json({ ok: true, admin: ehAdmin(p), trocar_pin: prov }, 200, { 'Set-Cookie': cookie });
+}
+
+// A pessoa escolhe o próprio PIN (primeiro acesso, ou quando quiser)
+async function trocarPin(request, env, db, p) {
+  const b = await corpo(request);
+  const pin = String(b.pin || '');
+  if (!pinValido(pin)) return json({ erro: 'O PIN precisa ter 6 números.' }, 400);
+  if (await conferePin(pin, p.pin_hash)) return json({ erro: 'Escolha um PIN diferente do atual.' }, 400);
+  if (/^(\d)\1{5}$/.test(pin) || pin === '123456' || pin === '654321') return json({ erro: 'Esse PIN é fácil demais. Escolha outro.' }, 400);
+  const novo = await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { pin_hash: await hashPin(pin), erros_pin: 0, bloqueado_ate: null });
+  await marcarProvisorio(db, p.id, false);
+  const cookie = await criarCookie(env, novo[0], new URL(request.url).protocol === 'https:', false); // o PIN novo derruba a sessão antiga: entra de novo já com a nova
+  return json({ ok: true, admin: ehAdmin(novo[0]) }, 200, { 'Set-Cookie': cookie });
 }
 
 // ---------- tela ----------
@@ -126,6 +140,7 @@ async function admin(request, url, env, db, p) {
     const chave = novaChaveLink();
     const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
     await guardarLink(env, db, novo[0].id, chave);
+    await marcarProvisorio(db, novo[0].id, true);
     return json({ pessoa: publica(novo[0]), link: origem + '/a/' + chave, pin });
   }
   if (rota === 'pessoas-lote' && request.method === 'POST') {
@@ -144,6 +159,7 @@ async function admin(request, url, env, db, p) {
         const chave = novaChaveLink();
         const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
         await guardarLink(env, db, novo[0].id, chave);
+        await marcarProvisorio(db, novo[0].id, true);
         existentes.add(nome.toLowerCase());
         saida.push({ nome, ok: true, id: novo[0].id, link: origem + '/a/' + chave, pin });
       } catch (e) { saida.push({ nome: String(it.nome || ''), ok: false, erro: String((e && e.message) || e) }); }
@@ -171,18 +187,20 @@ async function admin(request, url, env, db, p) {
       if (b.novo_pin !== false) { pin = pinAleatorio(); dados.pin_hash = await hashPin(pin); }
       await db.upd('pt_pessoas', { id: 'eq.' + id }, dados);
       await guardarLink(env, db, id, chave);
+      if (pin && alvo.modelo !== 'admin') await marcarProvisorio(db, id, true);
       return json({ link: origem + '/a/' + chave, pin });
     }
     if (acao === 'novo-pin') {
       const pin = b.pin ? String(b.pin) : pinAleatorio();
       if (!pinValido(pin)) throw new Error('O PIN precisa ter 6 números.');
       await db.upd('pt_pessoas', { id: 'eq.' + id }, { pin_hash: await hashPin(pin), erros_pin: 0, bloqueado_ate: null });
+      if (alvo.modelo !== 'admin') await marcarProvisorio(db, id, true);
       return json({ pin });
     }
     if (acao === 'desbloquear') { await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: 0, bloqueado_ate: null }); return json({ ok: true }); }
     if (acao === 'excluir') {
       if (alvo.modelo === 'admin') return json({ erro: 'O administrador não pode ser excluído.' }, 403);
-      await db.del('pt_pessoas', { id: 'eq.' + id }); await db.del('pt_config', { chave: 'eq.link_' + id }).catch(() => {}); return json({ ok: true });
+      await db.del('pt_pessoas', { id: 'eq.' + id }); await db.del('pt_config', { chave: 'eq.link_' + id }).catch(() => {}); await marcarProvisorio(db, id, false).catch(() => {}); return json({ ok: true });
     }
   }
   if (rota === 'acessos' && request.method === 'GET') {
@@ -270,7 +288,9 @@ export async function api(request, url, env, db) {
     const p = legado ? null : await pessoaDaSessao(request, env, db);
     if (!legado && !p) return json({ erro: 'Sessão expirada. Abra de novo o link que você recebeu e digite o PIN.', sem_sessao: true }, 401);
 
-    if (rota === '/api/eu') return json({ nome: legado ? 'Teste' : p.nome, admin: legado ? false : ehAdmin(p), perm: legado ? { contagem: true, bilheteria: true, bar: true } : permissoes(p) });
+    if (!legado && p._prov && rota !== '/api/eu' && rota !== '/api/trocar-pin') return json({ erro: 'Escolha o seu PIN novo para continuar.', trocar_pin: true }, 403);
+    if (rota === '/api/trocar-pin' && request.method === 'POST') { if (legado) return json({ erro: 'Não disponível.' }, 400); return await trocarPin(request, env, db, p); }
+    if (rota === '/api/eu') return json({ trocar_pin: legado ? false : !!p._prov, nome: legado ? 'Teste' : p.nome, admin: legado ? false : ehAdmin(p), perm: legado ? { contagem: true, bilheteria: true, bar: true } : permissoes(p) });
     if (rota === '/api/painel') return await painelDaPessoa(request, url, env, db, p, legado);
     if (rota === '/api/noites') return await noitesDaPessoa(db, p, legado);
     if (rota.startsWith('/api/admin/')) {

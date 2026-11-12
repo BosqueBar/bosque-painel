@@ -221,15 +221,16 @@ function listaPessoas(extra) {
     }).join('') : '<div class="empty">Ninguém cadastrado ainda.</div>');
   el().onclick = acaoPessoa;
 }
+function msgAcesso(nome, link, pin) {
+  return 'Oi, ' + nome.split(' ')[0] + '! Este é o seu link para o painel em tempo real do Bosque: ' + link +
+    (pin ? '\n\nPIN provisório: ' + pin + '\nNo primeiro acesso você escolhe o seu próprio PIN. Salve o link na tela inicial do celular.' : '');
+}
 function caixaAcesso(nome, link, pin, titulo) {
-  const msg1 = 'Oi, ' + nome + '! Este é o seu link para o painel em tempo real do Bosque: ' + link;
-  const msg2 = 'Seu PIN de acesso ao painel do Bosque: ' + pin + ' (não compartilhe).';
   return '<div class="caixa"><b style="margin-top:0">' + esc(titulo) + '</b>' +
-    '<b>Link</b>' + esc(link) + (pin ? '<b>PIN</b><span class="grande">' + esc(pin) + '</span>' : '') +
-    '<div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg1) + '">1) Enviar link por WhatsApp</a>' +
-    (pin ? '<a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg2) + '">2) Enviar PIN por WhatsApp</a>' : '') +
+    '<b>Link</b>' + esc(link) + (pin ? '<b>PIN provisório</b><span class="grande">' + esc(pin) + '</span>' : '') +
+    '<div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msgAcesso(nome, link, pin)) + '">Encaminhar por WhatsApp</a>' +
     '<button class="bt sec peq" data-copiar="' + esc(link) + '">Copiar link</button></div>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">O link é fixo: a pessoa pode salvar na tela inicial do celular. Você pode ver e reenviar o mesmo link quando quiser em "Ver / reenviar link". Mande o link e o PIN em mensagens separadas.</p></div>';
+    '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">' + (pin ? 'No primeiro acesso a pessoa troca o PIN provisório pelo próprio. ' : '') + 'O link é fixo e você pode reenviá-lo quando quiser em "Ver / reenviar link".</p></div>';
 }
 async function acaoPessoa(ev) {
   const c = ev.target.closest('[data-copiar]'); if (c) return copiar(c.getAttribute('data-copiar'), c);
@@ -242,7 +243,7 @@ async function acaoPessoa(ev) {
     if (a === 'editar') return formPessoa(p);
     if (a === 'ver') { const j = await chamar('POST', '/api/admin/pessoas/' + id + '/ver-link', {}); if (!j.link) { alert('O link de ' + p.nome + ' foi criado antes de eu guardá-lo. Use "Trocar link" uma única vez; daí em diante ele fica guardado e fixo.'); return; } await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, null, 'Link de ' + p.nome)); return; }
     if (a === 'link') { if (!confirm('Trocar o link de ' + p.nome + '? O link antigo para de funcionar, o PIN também muda e a pessoa terá de salvar o novo na tela inicial. Só faça isso se o link vazou.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
-    if (a === 'pin') { if (!confirm('Trocar o PIN de ' + p.nome + '?')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-pin', {}); await abaPessoasRecarrega('<div class="caixa"><b style="margin-top:0">Novo PIN de ' + esc(p.nome) + '</b><span class="grande">' + esc(j.pin) + '</span><div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap('Seu novo PIN do painel do Bosque: ' + j.pin) + '">Enviar PIN por WhatsApp</a></div></div>'); return; }
+    if (a === 'pin') { if (!confirm('Trocar o PIN de ' + p.nome + '?')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-pin', {}); await abaPessoasRecarrega('<div class="caixa"><b style="margin-top:0">PIN provisório de ' + esc(p.nome) + '</b><span class="grande">' + esc(j.pin) + '</span><div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap('Seu novo PIN provisório do painel do Bosque: ' + j.pin + '. No próximo acesso você escolhe o seu.') + '">Encaminhar por WhatsApp</a></div></div>'); return; }
     if (a === 'desbloquear') { await chamar('POST', '/api/admin/pessoas/' + id + '/desbloquear', {}); return abaPessoasRecarrega(); }
     if (a === 'ativo') { await chamar('POST', '/api/admin/pessoas/' + id + '/atualizar', { ativo: !p.ativo }); return abaPessoasRecarrega(); }
     if (a === 'excluir') { if (!confirm('Excluir ' + p.nome + ' de vez? Isso apaga o acesso e o histórico dessa pessoa.')) return; await chamar('POST', '/api/admin/pessoas/' + id + '/excluir', {}); return abaPessoasRecarrega(); }
@@ -331,7 +332,7 @@ function formLote() {
   document.getElementById('l-txt').oninput = function () {
     itens = this.value.split(/\r?\n/).map(interpretarLinha).filter(Boolean);
     const bons = itens.filter(function (i) { return i.modelo; });
-    prev.innerHTML = itens.length ? '<table class="t" style="margin-top:10px"><tr><th>Nome</th><th>Modelo</th><th>Dias</th><th>PIN</th></tr>' + itens.map(function (i) {
+    prev.innerHTML = itens.length ? '<table class="t" style="margin-top:10px"><tr><th>Nome</th><th>Modelo</th><th>Dias</th><th>PIN provisório</th></tr>' + itens.map(function (i) {
       return '<tr><td>' + esc(i.nome) + '</td><td>' + (i.modelo ? esc((MODELOS[i.modelo] || {}).rotulo || i.modelo) + (i.modelos.length > 1 ? ' +' + (i.modelos.length - 1) : '') : '<span class="chip verm">acesso não entendido: ' + esc(i.acessoTxt) + '</span>') + '</td><td>' + i.dias.map(function (d) { return DIAS[d]; }).join(', ') + '</td><td>' + (i.pin.length === 6 ? i.pin : '<span class="chip verm">PIN?</span>') + '</td></tr>';
     }).join('') + '</table><p style="font-size:12px;color:var(--text-muted)">' + bons.length + ' de ' + itens.length + ' linhas prontas.</p>' : '';
     btn.disabled = !itens.length || bons.length !== itens.length || itens.some(function (i) { return i.pin.length !== 6; });
@@ -342,12 +343,10 @@ function formLote() {
     try {
       const j = await chamar('POST', '/api/admin/pessoas-lote', { pessoas: itens.map(function (i) { return { nome: i.nome, modelo: i.modelo, dias: i.dias, pin: i.pin }; }) });
       const certos = j.resultados.filter(function (x) { return x.ok; });
-      const html = '<div class="caixa"><b style="margin-top:0">' + certos.length + ' cadastrada(s). Envie o link de cada um por WhatsApp (o PIN vai em outra mensagem):</b>' +
+      const html = '<div class="caixa"><b style="margin-top:0">' + certos.length + ' cadastrada(s). Toque em <b>Encaminhar por WhatsApp</b> em cada linha: vai uma mensagem só, com o link e o PIN provisório (cada um escolhe o seu PIN no primeiro acesso):</b>' +
         '<table class="t">' + j.resultados.map(function (x) {
-          if (!x.ok) return '<tr><td>' + esc(x.nome) + '</td><td colspan="2"><span class="chip verm">' + esc(x.erro) + '</span></td></tr>';
-          const m1 = 'Oi, ' + x.nome.split(' ')[0] + '! Este é o seu link para o painel em tempo real do Bosque: ' + x.link;
-          const m2 = 'Seu PIN de acesso ao painel do Bosque: ' + x.pin + ' (não compartilhe).';
-          return '<tr><td>' + esc(x.nome) + '</td><td><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(m1) + '">Link</a></td><td><a class="bt sec peq" style="text-decoration:none" target="_blank" href="' + zap(m2) + '">PIN</a></td></tr>';
+          if (!x.ok) return '<tr><td>' + esc(x.nome) + '</td><td><span class="chip verm">' + esc(x.erro) + '</span></td></tr>';
+          return '<tr><td>' + esc(x.nome) + '</td><td style="text-align:right"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msgAcesso(x.nome, x.link, x.pin)) + '">Encaminhar por WhatsApp</a></td></tr>';
         }).join('') + '</table><p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Depois, o link de cada pessoa fica em Pessoas → Ver / reenviar link.</p></div>';
       await abaPessoasRecarrega(html);
     } catch (e) { document.getElementById('l-erro').textContent = e.message; btn.disabled = false; btn.textContent = 'Cadastrar'; }

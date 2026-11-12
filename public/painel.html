@@ -264,12 +264,14 @@ async function carregar() {
       const resp = await fetch('/api/noites' + q, { cache: 'no-store' });
       const r = await resp.json();
       if (resp.status === 401) return semSessao(r.erro);
+      if (r.trocar_pin) { location.href = '/entrar'; return; }
       if (r.erro) throw new Error(r.erro);
       renderizarLista(r.noites);
     } else {
       const resp = await fetch('/api/painel' + q + (NOITE ? sep + 'noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' });
       const r = await resp.json();
       if (resp.status === 401) return semSessao(r.erro);
+      if (r.trocar_pin) { location.href = '/entrar'; return; }
       if (r.erro) throw new Error(r.erro);
       HOJE = r.hoje; configurarNav();
       if (r.admin && !CHAVE) { const l = document.getElementById('link-admin'); if (l) l.style.display = ''; }

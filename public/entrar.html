@@ -118,7 +118,7 @@
 <script>
 const K = decodeURIComponent(location.pathname.replace(/^\/a\//, '').split('/')[0] || '');
 // já está logado neste aparelho (ex.: abriu pelo ícone da tela inicial)? Vai direto para o painel, sem PIN.
-fetch('/api/eu', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.nome) location.replace('/painel'); }).catch(function () {});
+fetch('/api/eu', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.trocar_pin) telaTrocar(); else if (j && j.nome) location.replace(j.admin ? '/admin' : '/painel'); }).catch(function () {});
 const f = document.getElementById('f'), erro = document.getElementById('erro'), ok = document.getElementById('ok');
 f.onsubmit = async function (e) {
   e.preventDefault(); erro.textContent = '';
@@ -129,9 +129,32 @@ f.onsubmit = async function (e) {
     const r = await fetch('/api/entrar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: K, pin: pin }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.erro || 'Não foi possível entrar.');
+    if (j.trocar_pin) return telaTrocar();
     location.href = j.admin ? '/admin' : '/painel';
   } catch (x) { erro.textContent = x.message; ok.disabled = false; ok.textContent = 'Entrar'; }
 };
+function telaTrocar() {
+  document.querySelector('h1').textContent = 'Escolha o seu PIN';
+  document.querySelector('h1 + p').textContent = 'Primeiro acesso: troque o PIN provisório por um só seu (6 números).';
+  document.getElementById('f').innerHTML = '<label class="l" for="pin1">PIN novo</label><input id="pin1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" autofocus style="font-size:24px;letter-spacing:.4em;text-align:center;font-family:monospace">' +
+    '<label class="l" for="pin2">Repita o PIN novo</label><input id="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" style="font-size:24px;letter-spacing:.4em;text-align:center;font-family:monospace">' +
+    '<p class="erro" id="erro"></p><button class="bt" id="ok" style="width:100%;margin-top:10px" type="submit">Salvar e entrar</button>';
+  const f2 = document.getElementById('f');
+  f2.onsubmit = async function (ev) {
+    ev.preventDefault();
+    const er = document.getElementById('erro'), bt = document.getElementById('ok'); er.textContent = '';
+    const a = document.getElementById('pin1').value.trim(), b = document.getElementById('pin2').value.trim();
+    if (!/^\d{6}$/.test(a)) { er.textContent = 'O PIN precisa ter 6 números.'; return; }
+    if (a !== b) { er.textContent = 'Os dois PINs não são iguais.'; return; }
+    bt.disabled = true; bt.textContent = 'Salvando…';
+    try {
+      const r = await fetch('/api/trocar-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: a }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.erro || 'Não foi possível salvar.');
+      location.href = j.admin ? '/admin' : '/painel';
+    } catch (x) { er.textContent = x.message; bt.disabled = false; bt.textContent = 'Salvar e entrar'; }
+  };
+}
 </script>
 </body>
 </html>
