@@ -128,6 +128,28 @@ async function admin(request, url, env, db, p) {
     await guardarLink(env, db, novo[0].id, chave);
     return json({ pessoa: publica(novo[0]), link: origem + '/a/' + chave, pin });
   }
+  if (rota === 'pessoas-lote' && request.method === 'POST') {
+    const lista = Array.isArray(b.pessoas) ? b.pessoas.slice(0, 100) : [];
+    if (!lista.length) throw new Error('Nenhuma pessoa para cadastrar.');
+    const existentes = new Set(((await db.sel('pt_pessoas', { select: 'nome' })) || []).map((x) => String(x.nome).trim().toLowerCase()));
+    const saida = [];
+    for (const it of lista) {
+      try {
+        const nome = String(it.nome || '').trim();
+        if (existentes.has(nome.toLowerCase())) { saida.push({ nome, ok: false, erro: 'já cadastrada(o): pulei' }); continue; }
+        const d = normalizar({ nome, modelo: it.modelo, dias: it.dias });
+        if (d.modelo === 'admin') throw new Error('Modelo inválido.');
+        const pin = it.pin ? String(it.pin) : pinAleatorio();
+        if (!pinValido(pin)) throw new Error('PIN precisa ter 6 números.');
+        const chave = novaChaveLink();
+        const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
+        await guardarLink(env, db, novo[0].id, chave);
+        existentes.add(nome.toLowerCase());
+        saida.push({ nome, ok: true, id: novo[0].id, link: origem + '/a/' + chave, pin });
+      } catch (e) { saida.push({ nome: String(it.nome || ''), ok: false, erro: String((e && e.message) || e) }); }
+    }
+    return json({ resultados: saida });
+  }
   let m = rota.match(/^pessoas\/(\d+)\/(atualizar|novo-link|novo-pin|desbloquear|excluir|ver-link)$/);
   if (m && request.method === 'POST') {
     const id = Number(m[1]), acao = m[2];

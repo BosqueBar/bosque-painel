@@ -203,7 +203,7 @@ function resumoDias(p) {
   return d + ((p.datas || []).length ? ' + ' + p.datas.map(dataBR).join(', ') : '');
 }
 function listaPessoas(extra) {
-  el().innerHTML = (extra || '') + '<div style="margin-bottom:12px"><button class="bt" data-a="nova">+ Nova pessoa</button></div>' +
+  el().innerHTML = (extra || '') + '<div style="margin-bottom:12px" class="acoes"><button class="bt" data-a="nova">+ Nova pessoa</button><button class="bt sec" data-a="lote">Cadastrar várias de uma vez</button></div>' +
     (PESSOAS.length ? PESSOAS.map(function (p) {
       const perms = [p.perm_contagem ? 'Contagem' : '', p.perm_bilheteria ? 'Bilheteria' : '', p.perm_bar ? 'Bar' : ''].filter(Boolean);
       const adm = p.modelo === 'admin';
@@ -238,6 +238,7 @@ async function acaoPessoa(ev) {
   const p = PESSOAS.find(function (x) { return x.id === id; });
   try {
     if (a === 'nova') return formPessoa(null);
+    if (a === 'lote') return formLote();
     if (a === 'editar') return formPessoa(p);
     if (a === 'ver') { const j = await chamar('POST', '/api/admin/pessoas/' + id + '/ver-link', {}); if (!j.link) { alert('O link de ' + p.nome + ' foi criado antes de eu guardá-lo. Use "Trocar link" uma única vez; daí em diante ele fica guardado e fixo.'); return; } await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, null, 'Link de ' + p.nome)); return; }
     if (a === 'link') { if (!confirm('Trocar o link de ' + p.nome + '? O link antigo para de funcionar, o PIN também muda e a pessoa terá de salvar o novo na tela inicial. Só faça isso se o link vazou.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
@@ -296,6 +297,60 @@ function formPessoa(p) {
         await abaPessoasRecarrega(caixaAcesso(j.pessoa.nome, j.link, j.pin, 'Acesso criado para ' + j.pessoa.nome));
       } else { await chamar('POST', '/api/admin/pessoas/' + p.id + '/atualizar', corpo); await abaPessoasRecarrega(); }
     } catch (e) { $('f-erro').textContent = e.message; }
+  };
+}
+
+// ---------- cadastro em lote (cola a tabela da planilha) ----------
+const sem = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); };
+const DIA_NOME = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+function interpretarLinha(txt) {
+  const cols = txt.split('\t').map(function (c) { return c.trim(); });
+  if (cols.length < 2 || !cols[0]) return null;
+  const nome = cols[0], acesso = sem(cols[1]), diasTxt = sem(cols[2] || ''), pin = (cols[3] || '').replace(/\D/g, '');
+  if (nome.toLowerCase() === 'nome') return null; // cabeçalho
+  const modelos = [];
+  if (/full/.test(acesso)) modelos.push('full');
+  if (/operacional/.test(acesso)) modelos.push('operacional');
+  if (/bsqnt|quinta/.test(acesso)) modelos.push('socios_bsqnt');
+  if (/sexta/.test(acesso)) modelos.push('socios_sexta');
+  if (/sabado/.test(acesso)) modelos.push('socios_sabado');
+  if (/sambinha|domingo/.test(acesso)) modelos.push('socios_sambinha');
+  let dias = [];
+  if (/todos/.test(diasTxt)) dias = [0, 1, 2, 3, 4, 5, 6];
+  else Object.keys(DIA_NOME).forEach(function (k) { if (diasTxt.indexOf(k) >= 0) dias.push(DIA_NOME[k]); });
+  if (!dias.length) modelos.forEach(function (m) { (MODELOS[m] ? MODELOS[m].dias : []).forEach(function (d) { if (dias.indexOf(d) < 0) dias.push(d); }); });
+  return { nome: nome, modelo: modelos[0] || '', modelos: modelos, dias: dias, pin: pin, acessoTxt: cols[1], diasTxt: cols[2] || '' };
+}
+function formLote() {
+  el().innerHTML = '<div class="card"><p class="b-st">Cadastrar várias pessoas de uma vez</p>' +
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0">Copie as linhas da sua tabela (colunas: <b>Nome, Acesso, Dias, Senha</b>), cole abaixo e confira a prévia antes de cadastrar. Quem tiver mais de um acesso de sócio (ex.: BSQNT + Sábado + Sambinha) recebe os dias somados, e o bar fica sempre travado.</p>' +
+    '<textarea id="l-txt" rows="8" style="width:100%;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;font-family:inherit" placeholder="Cole aqui"></textarea>' +
+    '<div id="l-prev"></div><p class="erro" id="l-erro"></p><div class="acoes"><button class="bt" id="l-ok" disabled>Cadastrar</button><button class="bt sec" id="l-cancela">Cancelar</button></div></div>';
+  let itens = [];
+  const prev = document.getElementById('l-prev'), btn = document.getElementById('l-ok');
+  document.getElementById('l-txt').oninput = function () {
+    itens = this.value.split(/\r?\n/).map(interpretarLinha).filter(Boolean);
+    const bons = itens.filter(function (i) { return i.modelo; });
+    prev.innerHTML = itens.length ? '<table class="t" style="margin-top:10px"><tr><th>Nome</th><th>Modelo</th><th>Dias</th><th>PIN</th></tr>' + itens.map(function (i) {
+      return '<tr><td>' + esc(i.nome) + '</td><td>' + (i.modelo ? esc((MODELOS[i.modelo] || {}).rotulo || i.modelo) + (i.modelos.length > 1 ? ' +' + (i.modelos.length - 1) : '') : '<span class="chip verm">acesso não entendido: ' + esc(i.acessoTxt) + '</span>') + '</td><td>' + i.dias.map(function (d) { return DIAS[d]; }).join(', ') + '</td><td>' + (i.pin.length === 6 ? i.pin : '<span class="chip verm">PIN?</span>') + '</td></tr>';
+    }).join('') + '</table><p style="font-size:12px;color:var(--text-muted)">' + bons.length + ' de ' + itens.length + ' linhas prontas.</p>' : '';
+    btn.disabled = !itens.length || bons.length !== itens.length || itens.some(function (i) { return i.pin.length !== 6; });
+  };
+  document.getElementById('l-cancela').onclick = function () { abaPessoasRecarrega(); };
+  btn.onclick = async function () {
+    btn.disabled = true; btn.textContent = 'Cadastrando…'; document.getElementById('l-erro').textContent = '';
+    try {
+      const j = await chamar('POST', '/api/admin/pessoas-lote', { pessoas: itens.map(function (i) { return { nome: i.nome, modelo: i.modelo, dias: i.dias, pin: i.pin }; }) });
+      const certos = j.resultados.filter(function (x) { return x.ok; });
+      const html = '<div class="caixa"><b style="margin-top:0">' + certos.length + ' cadastrada(s). Envie o link de cada um por WhatsApp (o PIN vai em outra mensagem):</b>' +
+        '<table class="t">' + j.resultados.map(function (x) {
+          if (!x.ok) return '<tr><td>' + esc(x.nome) + '</td><td colspan="2"><span class="chip verm">' + esc(x.erro) + '</span></td></tr>';
+          const m1 = 'Oi, ' + x.nome.split(' ')[0] + '! Este é o seu link para o painel em tempo real do Bosque: ' + x.link;
+          const m2 = 'Seu PIN de acesso ao painel do Bosque: ' + x.pin + ' (não compartilhe).';
+          return '<tr><td>' + esc(x.nome) + '</td><td><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(m1) + '">Link</a></td><td><a class="bt sec peq" style="text-decoration:none" target="_blank" href="' + zap(m2) + '">PIN</a></td></tr>';
+        }).join('') + '</table><p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Depois, o link de cada pessoa fica em Pessoas → Ver / reenviar link.</p></div>';
+      await abaPessoasRecarrega(html);
+    } catch (e) { document.getElementById('l-erro').textContent = e.message; btn.disabled = false; btn.textContent = 'Cadastrar'; }
   };
 }
 
