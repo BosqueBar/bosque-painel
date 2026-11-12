@@ -135,7 +135,8 @@ const P = new URLSearchParams(location.search);
 const CHAVE = P.get('chave') || '';
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const raiz = document.getElementById('raiz');
-let MODELOS = {}, PESSOAS = [], ABA = 'pessoas', ONLINE = [], APARELHOS = {};
+const sem = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); };
+let MODELOS = {}, PESSOAS = [], ABA = 'pessoas', ONLINE = [], APARELHOS = {}, BUSCA = '';
 
 function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 async function chamar(metodo, rota, corpo) {
@@ -211,7 +212,24 @@ function resumoDias(p) {
 }
 function listaPessoas(extra) {
   el().innerHTML = (extra || '') + '<div style="margin-bottom:12px" class="acoes"><button class="bt" data-a="nova">+ Nova pessoa</button><button class="bt sec" data-a="lote">Cadastrar várias de uma vez</button></div>' +
-    (PESSOAS.length ? PESSOAS.map(function (p) {
+    '<input id="busca" type="search" placeholder="Buscar por nome ou modelo (ex.: Rodrigo, Full, Sexta)" value="' + esc(BUSCA) + '" style="margin-bottom:12px">' +
+    '<div id="lista-p">' + conteudoLista() + '</div>';
+  el().onclick = acaoPessoa;
+  const campo = document.getElementById('busca');
+  campo.oninput = function () { BUSCA = this.value; document.getElementById('lista-p').innerHTML = conteudoLista(); };
+  if (BUSCA) { campo.focus(); campo.setSelectionRange(BUSCA.length, BUSCA.length); }
+}
+function filtradas() {
+  const q = sem(BUSCA).trim(); if (!q) return PESSOAS;
+  return PESSOAS.filter(function (p) {
+    const alvo = sem(p.nome + ' ' + (p.modelo === 'admin' ? 'administrador' : ((MODELOS[p.modelo] || {}).rotulo || p.modelo)) + ' ' + (p.ativo ? '' : 'desativado') + ' ' + (p.bloqueado ? 'bloqueado' : '') + ' ' + resumoDias(p));
+    return q.split(/\s+/).every(function (t) { return alvo.indexOf(t) >= 0; });
+  });
+}
+function conteudoLista() {
+  const lista = filtradas();
+  return (BUSCA ? '<p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">' + lista.length + ' de ' + PESSOAS.length + ' pessoa(s)</p>' : '') +
+    (lista.length ? lista.map(function (p) {
       const perms = [p.perm_contagem ? 'Contagem' : '', p.perm_bilheteria ? 'Bilheteria' : '', p.perm_bar ? 'Bar' : ''].filter(Boolean);
       const adm = p.modelo === 'admin';
       return '<div class="pess"><h3>' + esc(p.nome) + (ONLINE.indexOf(p.id) >= 0 ? ' <span class="chip verde">online agora</span>' : '') + '</h3>' +
@@ -225,8 +243,7 @@ function listaPessoas(extra) {
         '<button class="bt sec peq" data-a="pin" data-id="' + p.id + '">Trocar PIN</button>' +
         (p.bloqueado ? '<button class="bt peq" data-a="desbloquear" data-id="' + p.id + '">Desbloquear</button>' : '') +
         (adm ? '' : '<button class="bt sec peq" data-a="ativo" data-id="' + p.id + '">' + (p.ativo ? 'Desativar' : 'Reativar') + '</button><button class="bt perigo peq" data-a="excluir" data-id="' + p.id + '">Excluir</button>') + '</div></div>';
-    }).join('') : '<div class="empty">Ninguém cadastrado ainda.</div>');
-  el().onclick = acaoPessoa;
+    }).join('') : '<div class="empty">' + (PESSOAS.length ? 'Ninguém encontrado com essa busca.' : 'Ninguém cadastrado ainda.') + '</div>');
 }
 function msgAcesso(nome, link, pin) {
   return 'Oi, ' + nome.split(' ')[0] + '! Este é o seu link para o painel em tempo real do Bosque: ' + link +
@@ -309,7 +326,6 @@ function formPessoa(p) {
 }
 
 // ---------- cadastro em lote (cola a tabela da planilha) ----------
-const sem = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); };
 const DIA_NOME = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
 function interpretarLinha(txt) {
   const cols = txt.split('\t').map(function (c) { return c.trim(); });
