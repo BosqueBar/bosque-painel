@@ -122,16 +122,16 @@ function configurarNav() {
   else if (NOITE && NOITE !== HOJE) { nav.textContent = '← Eventos'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
   else { nav.textContent = 'Eventos'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
 }
-function renderizarLista(lista, proximas) {
+function renderizarLista(lista, proximas, hoje) {
   document.getElementById('nome-evento').textContent = 'Eventos';
-  const total = (lista ? lista.length : 0) + (proximas ? proximas.length : 0);
+  const total = (lista ? lista.length : 0) + (proximas ? proximas.length : 0) + (hoje ? hoje.length : 0);
   document.getElementById('atualizado').textContent = total + ' evento(s)';
   const c = document.getElementById('conteudo');
   if (!total) { c.innerHTML = '<div class="empty">Nenhum evento encontrado ainda.</div>'; return; }
   const itens = function (l) { return l.map(function (i) {
     return '<a class="item-lista" href="#" data-data="' + esc(i.data) + '"><p class="nome">' + esc(i.evento || i.data) + '</p><p class="data">' + esc(i.data.split('-').reverse().join('/')) + '</p></a>';
   }).join(''); };
-  c.innerHTML = (proximas && proximas.length ? '<p class="section-title">Próximos eventos</p>' + itens(proximas) : '') +
+  c.innerHTML = (hoje && hoje.length ? '<p class="section-title">Hoje · ao vivo</p>' + itens(hoje) : '') + (proximas && proximas.length ? '<p class="section-title"' + (hoje && hoje.length ? ' style="margin-top:14px"' : '') + '>Próximos eventos</p>' + itens(proximas) : '') +
     (lista && lista.length ? '<p class="section-title" style="margin-top:14px">Eventos passados</p>' + itens(lista) : '');
   Array.prototype.forEach.call(c.querySelectorAll('.item-lista'), function (el) {
     el.onclick = function (e) { e.preventDefault(); irPara({ noite: el.getAttribute('data-data') }); };
@@ -290,7 +290,7 @@ async function carregar() {
       if (resp.status === 401) return semSessao(r.erro);
       if (r.trocar_pin) { location.href = '/entrar'; return; }
       if (r.erro) throw new Error(r.erro);
-      renderizarLista(r.noites, r.proximas);
+      renderizarLista(r.noites, r.proximas, r.hoje);
     } else {
       const resp = await fetch('/api/painel' + q + (NOITE ? sep + 'noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' });
       const r = await resp.json();

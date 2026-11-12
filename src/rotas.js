@@ -121,7 +121,8 @@ async function noitesDaPessoa(db, p, legado) {
   const ref = hoje || somarDias(agora, -1);
   const r = await db.sel('pt_painel', { select: 'noite,evento:dados->>evento', order: 'noite.desc', limit: 300 });
   const todas = (r || []).filter((x) => legado || podeVerNoite(p, x.noite)).map((x) => ({ data: x.noite, evento: x.evento || '' }));
-  return json({ noites: todas.filter((x) => x.data <= ref), proximas: todas.filter((x) => x.data > ref).sort((a, b) => (a.data > b.data ? 1 : -1)) });
+  // a noite em andamento (ou de hoje, depois das 14h) não é "passada": aparece em "Hoje"
+  return json({ hoje: todas.filter((x) => hoje && x.data === hoje), noites: todas.filter((x) => x.data <= ref && x.data !== hoje), proximas: todas.filter((x) => x.data > ref).sort((a, b) => (a.data > b.data ? 1 : -1)) });
 }
 
 // ---------- administração ----------
