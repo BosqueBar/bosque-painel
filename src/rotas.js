@@ -1,6 +1,6 @@
 // Rotas da tela e da administração (acesso por pessoa). Respostas em JSON; nada de dado pessoal em log.
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
-  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, lerTokenZig, rotuloAparelho } from './auth.js';
+  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
@@ -194,12 +194,21 @@ async function admin(request, url, env, db, p) {
     let noite = hoje;
     if (!noite) { const u = await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 1 }); noite = (u && u[0] && u[0].noite) || agora; }
     const f = await db.sel('pt_fontes', { noite: 'eq.' + noite });
-    const tz = await lerTokenZig(env, db);
+    const tk = await lerTokens(env, db);
     return json({
       noite, ao_vivo: !!hoje,
       fontes: (f || []).map((x) => ({ fonte: x.fonte, atualizado_em: x.atualizado_em, tentativa_em: x.tentativa_em, erro: x.erro })),
-      token_zig: { guardado: !!tz, atualizado_em: tz ? tz.atualizado_em : null, variavel_antiga: !!env.ZIG_TOKEN }
+      token_zig: { guardado: !!tk.zig_token, atualizado_em: tk.zig_token ? tk.zig_token.atualizado_em : null, variavel_antiga: !!env.ZIG_TOKEN },
+      tokens_porta: DIAS_TOKEN.map((d) => ({ dia: d, guardado: !!tk['st_token_' + d], atualizado_em: tk['st_token_' + d] ? tk['st_token_' + d].atualizado_em : null, variavel_antiga: !!env['SUPERTICKET_TOKEN_' + d] }))
     });
+  }
+  if (rota === 'tokens-porta' && request.method === 'POST') {
+    const dia = String(b.dia || '').toUpperCase();
+    if (!DIAS_TOKEN.includes(dia)) throw new Error('Dia inválido.');
+    const t = String(b.token || '').trim().replace(/^Bearer\s+/i, '');
+    if (t.length < 20 || /\s/.test(t)) throw new Error('Esse texto não parece um token. Cole o token inteiro, sem espaços.');
+    await guardarTokenIngresso(env, db, dia, t);
+    return json({ ok: true });
   }
   if (rota === 'zig-token' && request.method === 'POST') {
     const t = String(b.token || '').trim().replace(/^Bearer\s+/i, '');

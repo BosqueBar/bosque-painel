@@ -6,7 +6,7 @@ import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
 import { montarConsolidado } from './consolidado.js';
 import { somarDias, diaSemana } from './util.js';
-import { envComTokenZig } from './auth.js';
+import { envComTokens } from './auth.js';
 
 const FONTES = ['sympla', 'zig_ingressos', 'zig_bar', 'ugo'];
 const SYMPLA_CAMPOS_UGO = ['sympla_entradas', 'sympla_entradas_f', 'sympla_entradas_m', 'sympla_entradas_sem_genero',
@@ -89,7 +89,7 @@ export async function consolidarNoite(db, dia) {
 // `agoraMs` e `minimo` permitem respeitar o intervalo de 1–2 min da UGO.
 export async function coletarNoite(env, db, dia, opcoes) {
   const o = opcoes || {};
-  env = await envComTokenZig(env, db); // token da Zig colado na tela de admin vale mais que a variável antiga
+  env = await envComTokens(env, db); // tokens colados na tela de admin valem mais que as variáveis antigas
   const antes = await lerFontes(db, dia);
   const hashes = antes.sympla && antes.sympla.dados && antes.sympla.dados.hash_emails_pagos
     ? { pagos: antes.sympla.dados.hash_emails_pagos, cortesia: antes.sympla.dados.hash_emails_cortesia } : null;

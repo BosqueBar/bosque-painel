@@ -7,7 +7,7 @@ import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
 import { coletarNoite, rodarAgendado } from './coletor.js';
 import { api } from './rotas.js';
-import { envComTokenZig } from './auth.js';
+import { envComTokens } from './auth.js';
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -58,12 +58,12 @@ async function teste(url, env) {
       return json(resto);
     }
     if (fonte === 'zig_ingressos') {
-      const r = await coletarZigIngressos(env, dia);
+      const r = await coletarZigIngressos(await envComTokens(env, criarDb(env)), dia);
       r.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(r);
     }
     if (fonte === 'zig_bar') {
-      const r = await coletarZigBar(await envComTokenZig(env, criarDb(env)), dia);
+      const r = await coletarZigBar(await envComTokens(env, criarDb(env)), dia);
       r.segundos = Math.round((Date.now() - t0) / 100) / 10;
       return json(r);
     }

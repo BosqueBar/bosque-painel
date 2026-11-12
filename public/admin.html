@@ -184,7 +184,7 @@ function criarAdmin() {
 
 // ---------- abas ----------
 function desenhar() {
-  const abas = [['pessoas', 'Pessoas'], ['acessos', 'Quem acessa'], ['noites', 'Noites extras'], ['zig', 'Token da Zig'], ['saude', 'Saúde']];
+  const abas = [['pessoas', 'Pessoas'], ['acessos', 'Quem acessa'], ['noites', 'Noites extras'], ['zig', 'Tokens da Zig'], ['saude', 'Saúde']];
   raiz.innerHTML = '<div class="abas">' + abas.map(function (a) { return '<span class="aba' + (ABA === a[0] ? ' on' : '') + '" data-aba="' + a[0] + '">' + a[1] + '</span>'; }).join('') + '</div><div id="aba"></div>';
   Array.prototype.forEach.call(raiz.querySelectorAll('.aba'), function (el) { el.onclick = function () { ABA = el.getAttribute('data-aba'); desenhar(); }; });
   ({ pessoas: abaPessoas, acessos: abaAcessos, noites: abaNoites, zig: abaZig, saude: abaSaude })[ABA]();
@@ -319,19 +319,35 @@ async function abaNoites() {
   el().onclick = async function (e) { const r = e.target.getAttribute('data-rm'); if (r && confirm('Remover a noite ' + dataBR(r) + '?')) { await chamar('POST', '/api/admin/noites/excluir', { dia: r }); abaNoites(); } };
 }
 
-// ---------- token da Zig ----------
+// ---------- tokens da Zig ----------
+const NOMES_DIA = { DOM: 'Domingo', SEG: 'Segunda', TER: 'Terça', QUA: 'Quarta', QUI: 'Quinta', SEX: 'Sexta', SAB: 'Sábado' };
+function estadoToken(t) {
+  const m = minutos(t.atualizado_em);
+  if (t.guardado) return 'colado em <b>' + quando(t.atualizado_em) + '</b>' + (m !== null && m > 60 * 24 * 6 ? ' <span class="chip verm">tem mais de 6 dias</span>' : '');
+  return t.variavel_antiga ? '<span style="color:var(--text-muted)">usando o token antigo do servidor</span>' : '<span class="chip verm">sem token</span>';
+}
 async function abaZig() {
   const j = await chamar('GET', '/api/admin/fontes');
-  const t = j.token_zig, m = minutos(t.atualizado_em);
-  el().innerHTML = '<div class="card"><p class="b-st">Token da Zig (troca toda segunda)</p>' +
-    '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">' + (t.guardado ? 'Último token colado: <b>' + quando(t.atualizado_em) + '</b>' + (m !== null && m > 60 * 24 * 6 ? ' <span class="chip verm">tem mais de 6 dias</span>' : '') : (t.variavel_antiga ? 'Nenhum token colado aqui ainda: o app está usando o token antigo da configuração do servidor.' : '<span class="chip verm">Nenhum token da Zig configurado</span>')) + '</p>' +
-    '<label class="l">Cole o token novo da Zig</label><input id="z-tok" type="password" autocomplete="off" placeholder="cole aqui o token inteiro">' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:6px 0 0">Ele fica guardado criptografado e nunca é mostrado de volta. Cole na segunda, antes das 10h.</p>' +
-    '<p class="erro" id="z-erro"></p><button class="bt" id="z-ok">Salvar token</button></div>';
-  document.getElementById('z-ok').onclick = async function () {
-    const erro = document.getElementById('z-erro'); erro.textContent = '';
-    try { await chamar('POST', '/api/admin/zig-token', { token: document.getElementById('z-tok').value }); document.getElementById('z-tok').value = ''; abaZig(); }
-    catch (e) { erro.textContent = e.message; }
+  const linha = function (t) {
+    return '<div class="pess"><h3>' + NOMES_DIA[t.dia] + '</h3><div style="font-size:12px;color:var(--text-muted)">' + estadoToken(t) + '</div>' +
+      '<div class="linha" style="margin-top:8px"><input type="password" autocomplete="off" id="tk-' + t.dia + '" placeholder="cole o token de ' + NOMES_DIA[t.dia].toLowerCase() + '"><button class="bt peq" data-tk="' + t.dia + '">Salvar</button></div></div>';
+  };
+  const ord = ['QUI', 'SEX', 'SAB', 'DOM', 'QUA', 'SEG', 'TER'];
+  const porta = ord.map(function (d) { return j.tokens_porta.find(function (x) { return x.dia === d; }); });
+  el().innerHTML = '<div class="card"><p class="b-st">Tokens da porta (Zig Tickets): um por dia, trocam toda semana</p>' +
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0">Cole o token novo de cada dia (quinta, sexta, sábado e domingo). Eles ficam criptografados e nunca são mostrados de volta. Faça isso na segunda, antes das 10h. Quarta, segunda e terça só servem para noites extras.</p><p class="erro" id="tk-erro"></p><p class="ok" id="tk-ok"></p></div>' +
+    porta.slice(0, 4).map(linha).join('') +
+    '<details style="margin:10px 0"><summary style="font-size:13px;color:var(--text-secondary);cursor:pointer">Dias extras (quarta, segunda, terça)</summary><div style="margin-top:8px">' + porta.slice(4).map(linha).join('') + '</div></details>' +
+    '<details style="margin:10px 0"><summary style="font-size:13px;color:var(--text-secondary);cursor:pointer">Token do bar (Zig ERP), só se ele mudar</summary><div class="pess" style="margin-top:8px"><div style="font-size:12px;color:var(--text-muted)">' + estadoToken(j.token_zig) + '</div>' +
+    '<div class="linha" style="margin-top:8px"><input type="password" autocomplete="off" id="tk-BAR" placeholder="cole o token do bar"><button class="bt peq" data-tk="BAR">Salvar</button></div></div></details>';
+  el().onclick = async function (e) {
+    const b = e.target.closest('[data-tk]'); if (!b) return;
+    const d = b.getAttribute('data-tk'), campo = document.getElementById('tk-' + d);
+    document.getElementById('tk-erro').textContent = ''; document.getElementById('tk-ok').textContent = '';
+    try {
+      await chamar('POST', d === 'BAR' ? '/api/admin/zig-token' : '/api/admin/tokens-porta', d === 'BAR' ? { token: campo.value } : { dia: d, token: campo.value });
+      campo.value = ''; await abaZig(); document.getElementById('tk-ok').textContent = 'Token salvo.';
+    } catch (x) { document.getElementById('tk-erro').textContent = x.message; }
   };
 }
 

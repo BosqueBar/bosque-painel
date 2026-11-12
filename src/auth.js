@@ -124,30 +124,40 @@ export function filtrarPainel(d, perm) {
   return saida;
 }
 
-// ---------- token da Zig (muda toda semana; fica criptografado e nunca volta para a tela) ----------
-export async function guardarTokenZig(env, db, token) {
+// ---------- tokens (Zig/SuperTicket): ficam criptografados e nunca voltam para a tela ----------
+export const DIAS_TOKEN = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+async function guardarSegredo(env, db, chave, valor) {
   const k = await chaveDerivada(env, 'cripto', 'aes');
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, enc.encode(token)));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, enc.encode(valor)));
   const junto = new Uint8Array(iv.length + ct.length); junto.set(iv); junto.set(ct, iv.length);
-  const agora = new Date().toISOString();
-  await db.ins('pt_config', [{ chave: 'zig_token', valor: b64u(junto), atualizado_em: agora }], { upsert: true, conflito: 'chave' });
+  await db.ins('pt_config', [{ chave, valor: b64u(junto), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
 }
-export async function lerTokenZig(env, db) {
+async function decifrar(env, valor) {
+  const b = deB64(valor.replace(/-/g, '+').replace(/_/g, '/'));
+  const k = await chaveDerivada(env, 'cripto', 'aes');
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, k, b.slice(12)));
+}
+export const guardarTokenZig = (env, db, token) => guardarSegredo(env, db, 'zig_token', token);                       // token do bar (Zig ERP)
+export const guardarTokenIngresso = (env, db, dia, token) => guardarSegredo(env, db, 'st_token_' + dia, token);      // token da porta, um por dia da semana
+// Lê todos os tokens guardados: { chave: { token, atualizado_em } }
+export async function lerTokens(env, db) {
+  const saida = {};
   try {
-    const r = await db.sel('pt_config', { select: 'valor,atualizado_em', chave: 'eq.zig_token' });
-    if (!r || !r[0] || !r[0].valor) return null;
-    const b = deB64(r[0].valor.replace(/-/g, '+').replace(/_/g, '/'));
-    const k = await chaveDerivada(env, 'cripto', 'aes');
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, k, b.slice(12));
-    return { token: new TextDecoder().decode(pt), atualizado_em: r[0].atualizado_em };
-  } catch (e) { return null; } // chave do banco trocada ou dado corrompido: cai para a variável antiga
+    const r = await db.sel('pt_config', { select: 'chave,valor,atualizado_em', or: '(chave.eq.zig_token,chave.like.st_token_*)' });
+    for (const x of r || []) { try { if (x.valor) saida[x.chave] = { token: await decifrar(env, x.valor), atualizado_em: x.atualizado_em }; } catch (e) { /* chave do banco trocada: ignora */ } }
+  } catch (e) { /* sem tokens guardados */ }
+  return saida;
 }
-// Ambiente com o token mais recente (o colado na tela de admin vale mais do que a variável antiga).
-export async function envComTokenZig(env, db) {
-  const t = await lerTokenZig(env, db);
-  return t ? Object.assign({}, env, { ZIG_TOKEN: t.token }) : env;
+// Ambiente com os tokens mais recentes (os colados na tela de admin valem mais do que as variáveis antigas do servidor).
+export async function envComTokens(env, db) {
+  const t = await lerTokens(env, db);
+  const novo = Object.assign({}, env);
+  if (t.zig_token) novo.ZIG_TOKEN = t.zig_token.token;
+  for (const d of DIAS_TOKEN) if (t['st_token_' + d]) novo['SUPERTICKET_TOKEN_' + d] = t['st_token_' + d].token;
+  return novo;
 }
+export const envComTokenZig = envComTokens;
 
 // ---------- aparelho ----------
 export async function rotuloAparelho(request) {
