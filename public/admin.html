@@ -128,7 +128,7 @@
 </head>
 <body>
   <div class="brandbar"><img src="/logo.png" alt="Bosque"><span>bosque. · administração</span></div>
-  <div class="header"><div><h1>Administração</h1><p id="quem"></p></div><a class="nav-link" href="/painel">← Painel</a></div>
+  <div class="header"><div><h1>Administração</h1><p id="quem"></p></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><a class="nav-link" href="/painel">← Painel</a><a class="nav-link" id="sair" href="#" style="border-color:var(--text-muted);color:var(--text-muted)">Sair</a></div></div>
   <div id="raiz"></div>
 <script>
 const P = new URLSearchParams(location.search);
@@ -473,6 +473,7 @@ async function abaSaude() {
   el().innerHTML = '<div class="card"><p class="b-st">Fontes da noite ' + dataBR(j.noite) + (j.ao_vivo ? ' (ao vivo)' : ' (fora do horário de evento)') + '</p><table class="t"><tr><th>Fonte</th><th>Estado</th><th>Última leitura</th></tr>' + linhas + '</table>' +
     '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Ao vivo, a fonte fica "atrasada" se passar de 3 minutos sem ler. Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>';
 }
+document.getElementById('sair').onclick = function (e) { e.preventDefault(); fetch('/api/sair', { method: 'POST' }).finally(function () { location.href = '/painel'; }); };
 iniciar();
 </script>
 </body>

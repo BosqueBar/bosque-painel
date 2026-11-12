@@ -118,7 +118,12 @@
 <script>
 const K = decodeURIComponent(location.pathname.replace(/^\/a\//, '').split('/')[0] || '');
 // já está logado neste aparelho (ex.: abriu pelo ícone da tela inicial)? Vai direto para o painel, sem PIN.
-fetch('/api/eu', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.trocar_pin) telaTrocar(); else if (j && j.nome) location.replace(j.admin ? '/admin' : '/painel'); }).catch(function () {});
+// Só pula o PIN se quem já está logado neste aparelho for o DONO deste link (outro link = outra pessoa = pede o PIN dela).
+fetch('/api/eu' + (K ? '?k=' + encodeURIComponent(K) : ''), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+  if (!j || !j.nome) return;
+  if (K && j.link_confere === false) return; // link de outra pessoa: mostra a tela do PIN
+  if (j.trocar_pin) telaTrocar(); else location.replace(j.admin ? '/admin' : '/painel');
+}).catch(function () {});
 const f = document.getElementById('f'), erro = document.getElementById('erro'), ok = document.getElementById('ok');
 f.onsubmit = async function (e) {
   e.preventDefault(); erro.textContent = '';

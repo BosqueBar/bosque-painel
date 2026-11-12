@@ -97,7 +97,7 @@
   <div class="brandbar"><img src="/logo.png" alt="Bosque"><span>bosque. · painel ao vivo</span></div>
   <div class="header">
     <div><h1 id="nome-evento">Carregando…</h1><p id="atualizado">carregando...</p></div>
-    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><a class="nav-link" id="nav-link" href="#"></a><a class="nav-link" id="link-admin" href="/admin" style="display:none">Administração</a></div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><a class="nav-link" id="nav-link" href="#"></a><a class="nav-link" id="link-admin" href="/admin" style="display:none">Administração</a><a class="nav-link" id="link-sair" href="#" style="display:none;border-color:var(--text-muted);color:var(--text-muted)">Sair</a></div>
   </div>
   <div id="conteudo"></div>
 <script>
@@ -298,6 +298,7 @@ async function carregar() {
       if (r.trocar_pin) { location.href = '/entrar'; return; }
       if (r.erro) throw new Error(r.erro);
       HOJE = r.hoje; configurarNav();
+      if (!CHAVE) document.getElementById('link-sair').style.display = '';
       if (r.admin && !CHAVE) { const l = document.getElementById('link-admin'); if (l) l.style.display = ''; }
       if (r.sem_noite) { document.getElementById('nome-evento').textContent = r.nome ? 'Olá, ' + r.nome : 'Painel'; document.getElementById('atualizado').textContent = ''; document.getElementById('conteudo').innerHTML = '<div class="empty">Nenhuma noite liberada para o seu acesso por enquanto.<br>Quando for a sua noite, ela aparece aqui sozinha.</div>'; return; }
       renderizar(r.painel, r.hoje, r.noite, !!r.ao_vivo, !!r.proxima);
@@ -311,6 +312,7 @@ function semSessao(msg) {
   document.getElementById('atualizado').textContent = '';
   document.getElementById('conteudo').innerHTML = '<div class="empty">' + esc(msg || 'Abra o link que você recebeu por WhatsApp e digite o seu PIN.') + '</div>';
 }
+document.getElementById('link-sair').onclick = function (e) { e.preventDefault(); fetch('/api/sair', { method: 'POST' }).finally(function () { document.cookie = 'x=; Max-Age=0'; location.href = '/painel'; }); };
 configurarNav();
 carregar();
 if (!HISTORICO) setInterval(carregar, 30000);

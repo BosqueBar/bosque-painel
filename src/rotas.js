@@ -312,7 +312,7 @@ export async function api(request, url, env, db) {
 
     if (!legado && p._prov && rota !== '/api/eu' && rota !== '/api/trocar-pin') return json({ erro: 'Escolha o seu PIN novo para continuar.', trocar_pin: true }, 403);
     if (rota === '/api/trocar-pin' && request.method === 'POST') { if (legado) return json({ erro: 'Não disponível.' }, 400); return await trocarPin(request, env, db, p); }
-    if (rota === '/api/eu') return json({ trocar_pin: legado ? false : !!p._prov, nome: legado ? 'Teste' : p.nome, admin: legado ? false : ehAdmin(p), perm: legado ? { contagem: true, bilheteria: true, bar: true } : permissoes(p) });
+    if (rota === '/api/eu') return json({ link_confere: (!legado && url.searchParams.get('k')) ? (await hashLink(url.searchParams.get('k'))) === p.chave_hash : null, trocar_pin: legado ? false : !!p._prov, nome: legado ? 'Teste' : p.nome, admin: legado ? false : ehAdmin(p), perm: legado ? { contagem: true, bilheteria: true, bar: true } : permissoes(p) });
     if (rota === '/api/painel') return await painelDaPessoa(request, url, env, db, p, legado);
     if (rota === '/api/noites') return await noitesDaPessoa(db, p, legado);
     if (rota.startsWith('/api/admin/')) {
