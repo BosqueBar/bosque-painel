@@ -83,7 +83,7 @@ export async function pessoaDaSessao(request, env, db) {
   if (d !== 0) return null;
   if (p.validade && p.validade < new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10)) return null;
   if (p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()) return null;
-  p._prov = f === '1';
+  p._prov = f === '1' || (p.erros_pin || 0) < 0; // erros_pin = -1: a administradora pediu a troca do PIN (vale na hora, até para quem já está logado)
   return p;
 }
 

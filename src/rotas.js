@@ -66,17 +66,17 @@ async function entrar(request, env, db) {
   if (!p || !p.ativo) return json({ erro: 'Link inválido ou desativado. Peça um novo à Annie.' }, 403);
   if (p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()) return json({ erro: 'Acesso bloqueado por muitos erros de PIN. Peça à Annie para liberar.' }, 423);
   if (!(await conferePin(pin, p.pin_hash))) {
-    const erros = (p.erros_pin || 0) + 1;
+    const erros = Math.max(0, p.erros_pin || 0) + 1;
     const dados = { erros_pin: erros };
     if (erros >= 5) dados.bloqueado_ate = BLOQUEIO_FIM;
     await db.upd('pt_pessoas', { id: 'eq.' + p.id }, dados);
     return json({ erro: erros >= 5 ? 'PIN errado 5 vezes: acesso bloqueado. Peça à Annie para liberar.' : 'PIN incorreto. Restam ' + (5 - erros) + ' tentativa(s).' }, 403);
   }
   if (p.validade && p.validade < agoraBR().dia) return json({ erro: 'Este acesso venceu.' }, 403);
-  if (p.erros_pin) await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { erros_pin: 0 });
+  if (p.erros_pin > 0) await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { erros_pin: 0 });
   const { hoje, agora } = await noiteAtual(db);
   await db.ins('pt_acessos', [{ pessoa_id: p.id, aparelho: await rotuloAparelho(request), noite: hoje || agora }]);
-  const prov = !ehAdmin(p) && (await ehProvisorio(db, p.id));
+  const prov = !ehAdmin(p) && ((p.erros_pin || 0) < 0 || (await ehProvisorio(db, p.id)));
   const cookie = await criarCookie(env, p, new URL(request.url).protocol === 'https:', prov);
   return json({ ok: true, admin: ehAdmin(p), trocar_pin: prov }, 200, { 'Set-Cookie': cookie });
 }
@@ -145,6 +145,14 @@ async function admin(request, url, env, db, p) {
     await marcarProvisorio(db, novo[0].id, true);
     return json({ pessoa: publica(novo[0]), link: origem + '/a/' + chave, pin });
   }
+  if (rota === 'pessoas-exigir-troca' && request.method === 'POST') {
+    const todos = ((await db.sel('pt_pessoas', { select: 'id', modelo: 'neq.admin' })) || []);
+    if (todos.length) {
+      await db.upd('pt_pessoas', { modelo: 'neq.admin' }, { erros_pin: -1 });
+      await db.ins('pt_config', todos.map((x) => ({ chave: 'pinprov_' + x.id, valor: '1', atualizado_em: new Date().toISOString() })), { upsert: true, conflito: 'chave' });
+    }
+    return json({ ok: true, total: todos.length });
+  }
   if (rota === 'pessoas-lote' && request.method === 'POST') {
     const lista = Array.isArray(b.pessoas) ? b.pessoas.slice(0, 100) : [];
     if (!lista.length) throw new Error('Nenhuma pessoa para cadastrar.');
@@ -168,12 +176,17 @@ async function admin(request, url, env, db, p) {
     }
     return json({ resultados: saida });
   }
-  let m = rota.match(/^pessoas\/(\d+)\/(atualizar|novo-link|novo-pin|desbloquear|excluir|ver-link)$/);
+  let m = rota.match(/^pessoas\/(\d+)\/(atualizar|novo-link|novo-pin|desbloquear|excluir|ver-link|exigir-troca)$/);
   if (m && request.method === 'POST') {
     const id = Number(m[1]), acao = m[2];
     const r = await db.sel('pt_pessoas', { id: 'eq.' + id });
     const alvo = r && r[0];
     if (!alvo) return json({ erro: 'Pessoa não encontrada.' }, 404);
+    if (acao === 'exigir-troca') {
+      if (alvo.modelo === 'admin') return json({ erro: 'O administrador escolhe o próprio PIN em "Trocar PIN".' }, 400);
+      await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: -1 }); await marcarProvisorio(db, id, true);
+      return json({ ok: true });
+    }
     if (acao === 'ver-link') { const k = await lerLink(env, db, id); return json({ link: k ? origem + '/a/' + k : null }); }
     if (acao === 'atualizar') {
       const d = normalizar(b, alvo);

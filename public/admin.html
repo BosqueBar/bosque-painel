@@ -211,7 +211,7 @@ function resumoDias(p) {
   return d + ((p.datas || []).length ? ' + ' + p.datas.map(dataBR).join(', ') : '');
 }
 function listaPessoas(extra) {
-  el().innerHTML = (extra || '') + '<div style="margin-bottom:12px" class="acoes"><button class="bt" data-a="nova">+ Nova pessoa</button><button class="bt sec" data-a="lote">Cadastrar várias de uma vez</button></div>' +
+  el().innerHTML = (extra || '') + '<div style="margin-bottom:12px" class="acoes"><button class="bt" data-a="nova">+ Nova pessoa</button><button class="bt sec" data-a="lote">Cadastrar várias de uma vez</button><button class="bt sec" data-a="todostroca">Pedir troca de PIN a todos</button></div>' +
     '<input id="busca" type="search" placeholder="Buscar por nome ou modelo (ex.: Rodrigo, Full, Sexta)" value="' + esc(BUSCA) + '" style="margin-bottom:12px">' +
     '<div id="lista-p">' + conteudoLista() + '</div>';
   el().onclick = acaoPessoa;
@@ -240,7 +240,7 @@ function conteudoLista() {
         '<div class="acoes">' + (adm ? '' : '<button class="bt sec peq" data-a="editar" data-id="' + p.id + '">Editar</button>') +
         '<button class="bt sec peq" data-a="ver" data-id="' + p.id + '">Ver / reenviar link</button>' +
         '<button class="bt sec peq" data-a="link" data-id="' + p.id + '">Trocar link (só se vazou)</button>' +
-        '<button class="bt sec peq" data-a="pin" data-id="' + p.id + '">Trocar PIN</button>' +
+        '<button class="bt sec peq" data-a="pin" data-id="' + p.id + '">Trocar PIN</button>' + (adm ? '' : '<button class="bt sec peq" data-a="troca" data-id="' + p.id + '">Pedir troca de PIN</button>') +
         (p.bloqueado ? '<button class="bt peq" data-a="desbloquear" data-id="' + p.id + '">Desbloquear</button>' : '') +
         (adm ? '' : '<button class="bt sec peq" data-a="ativo" data-id="' + p.id + '">' + (p.ativo ? 'Desativar' : 'Reativar') + '</button><button class="bt perigo peq" data-a="excluir" data-id="' + p.id + '">Excluir</button>') + '</div></div>';
     }).join('') : '<div class="empty">' + (PESSOAS.length ? 'Ninguém encontrado com essa busca.' : 'Ninguém cadastrado ainda.') + '</div>');
@@ -264,6 +264,8 @@ async function acaoPessoa(ev) {
   try {
     if (a === 'nova') return formPessoa(null);
     if (a === 'lote') return formLote();
+    if (a === 'todostroca') { if (!confirm('Pedir a TODAS as pessoas (menos administradores) que escolham um PIN novo no próximo acesso? Quem já trocou o PIN vai precisar escolher de novo.')) return; const j = await chamar('POST', '/api/admin/pessoas-exigir-troca', {}); alert(j.total + ' pessoa(s) vão escolher um PIN novo no próximo acesso.'); return; }
+    if (a === 'troca') { if (!confirm(p.nome + ' vai precisar escolher um PIN novo no próximo acesso (o PIN atual continua valendo até lá). Confirmar?')) return; await chamar('POST', '/api/admin/pessoas/' + id + '/exigir-troca', {}); alert('Pronto: ' + p.nome + ' escolhe um PIN novo no próximo acesso.'); return; }
     if (a === 'editar') return formPessoa(p);
     if (a === 'ver') { const j = await chamar('POST', '/api/admin/pessoas/' + id + '/ver-link', {}); if (!j.link) { alert('O link de ' + p.nome + ' foi criado antes de eu guardá-lo. Use "Trocar link" uma única vez; daí em diante ele fica guardado e fixo.'); return; } await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, null, 'Link de ' + p.nome)); return; }
     if (a === 'link') { if (!confirm('Trocar o link de ' + p.nome + '? O link antigo para de funcionar, o PIN também muda e a pessoa terá de salvar o novo na tela inicial. Só faça isso se o link vazou.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
