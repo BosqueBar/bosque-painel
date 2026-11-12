@@ -53,7 +53,7 @@ export async function conferePin(pin, guardado) {
 
 // ---------- sessão (cookie assinado) ----------
 const COOKIE = 'bosque_sessao';
-const DIAS_SESSAO = 30;
+const DIAS_SESSAO = 180; // quem salva o link na tela inicial não precisa digitar o PIN toda hora
 const versao = (p) => String(p.chave_hash).slice(0, 6) + String(p.pin_hash).slice(-6); // trocar link ou PIN derruba as sessões antigas
 async function assinar(env, texto) {
   const k = await chaveDerivada(env, 'sessao', 'hmac');
@@ -158,6 +158,11 @@ export async function envComTokens(env, db) {
   return novo;
 }
 export const envComTokenZig = envComTokens;
+// O link pessoal fica guardado criptografado para a administradora poder reenviar o MESMO link (ele nunca precisa mudar).
+export const guardarLink = (env, db, id, chave) => guardarSegredo(env, db, 'link_' + id, chave);
+export async function lerLink(env, db, id) {
+  try { const r = await db.sel('pt_config', { select: 'valor', chave: 'eq.link_' + id }); return r && r[0] && r[0].valor ? await decifrar(env, r[0].valor) : null; } catch (e) { return null; }
+}
 
 // ---------- aparelho ----------
 export async function rotuloAparelho(request) {

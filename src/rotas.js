@@ -1,6 +1,6 @@
 // Rotas da tela e da administração (acesso por pessoa). Respostas em JSON; nada de dado pessoal em log.
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
-  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
+  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
@@ -125,14 +125,16 @@ async function admin(request, url, env, db, p) {
     if (!pinValido(pin)) throw new Error('O PIN precisa ter 6 números.');
     const chave = novaChaveLink();
     const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
+    await guardarLink(env, db, novo[0].id, chave);
     return json({ pessoa: publica(novo[0]), link: origem + '/a/' + chave, pin });
   }
-  let m = rota.match(/^pessoas\/(\d+)\/(atualizar|novo-link|novo-pin|desbloquear|excluir)$/);
+  let m = rota.match(/^pessoas\/(\d+)\/(atualizar|novo-link|novo-pin|desbloquear|excluir|ver-link)$/);
   if (m && request.method === 'POST') {
     const id = Number(m[1]), acao = m[2];
     const r = await db.sel('pt_pessoas', { id: 'eq.' + id });
     const alvo = r && r[0];
     if (!alvo) return json({ erro: 'Pessoa não encontrada.' }, 404);
+    if (acao === 'ver-link') { const k = await lerLink(env, db, id); return json({ link: k ? origem + '/a/' + k : null }); }
     if (acao === 'atualizar') {
       const d = normalizar(b, alvo);
       if (alvo.modelo === 'admin') d.modelo = 'admin';
@@ -146,6 +148,7 @@ async function admin(request, url, env, db, p) {
       let pin = null;
       if (b.novo_pin !== false) { pin = pinAleatorio(); dados.pin_hash = await hashPin(pin); }
       await db.upd('pt_pessoas', { id: 'eq.' + id }, dados);
+      await guardarLink(env, db, id, chave);
       return json({ link: origem + '/a/' + chave, pin });
     }
     if (acao === 'novo-pin') {
@@ -157,7 +160,7 @@ async function admin(request, url, env, db, p) {
     if (acao === 'desbloquear') { await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: 0, bloqueado_ate: null }); return json({ ok: true }); }
     if (acao === 'excluir') {
       if (alvo.modelo === 'admin') return json({ erro: 'O administrador não pode ser excluído.' }, 403);
-      await db.del('pt_pessoas', { id: 'eq.' + id }); return json({ ok: true });
+      await db.del('pt_pessoas', { id: 'eq.' + id }); await db.del('pt_config', { chave: 'eq.link_' + id }).catch(() => {}); return json({ ok: true });
     }
   }
   if (rota === 'acessos' && request.method === 'GET') {
@@ -232,8 +235,10 @@ export async function api(request, url, env, db) {
       const chave = novaChaveLink();
       const dados = { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin), erros_pin: 0, bloqueado_ate: null, ativo: true };
       const ex = await db.sel('pt_pessoas', { modelo: 'eq.admin', order: 'id.asc', limit: 1 });
-      if (ex && ex[0]) await db.upd('pt_pessoas', { id: 'eq.' + ex[0].id }, dados);
-      else await db.ins('pt_pessoas', [Object.assign({ nome: String(b.nome || 'Annie').trim().slice(0, 80) || 'Annie', modelo: 'admin', dias: [0, 1, 2, 3, 4, 5, 6], perm_contagem: true, perm_bilheteria: true, perm_bar: true }, dados)]);
+      let idAdm;
+      if (ex && ex[0]) { await db.upd('pt_pessoas', { id: 'eq.' + ex[0].id }, dados); idAdm = ex[0].id; }
+      else { const n = await db.ins('pt_pessoas', [Object.assign({ nome: String(b.nome || 'Annie').trim().slice(0, 80) || 'Annie', modelo: 'admin', dias: [0, 1, 2, 3, 4, 5, 6], perm_contagem: true, perm_bilheteria: true, perm_bar: true }, dados)], { retorna: true }); idAdm = n[0].id; }
+      await guardarLink(env, db, idAdm, chave);
       return json({ link: url.origin + '/a/' + chave });
     }
     if (rota === '/api/entrar' && request.method === 'POST') return await entrar(request, env, db);

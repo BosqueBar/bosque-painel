@@ -213,7 +213,8 @@ function listaPessoas(extra) {
         (p.ativo ? '' : '<span class="chip verm">desativado</span>') + (p.bloqueado ? '<span class="chip verm">bloqueado (PIN errado)</span>' : '') +
         '<span class="chip">' + (APARELHOS[p.id] || 0) + ' aparelho(s)</span></div>' +
         '<div class="acoes">' + (adm ? '' : '<button class="bt sec peq" data-a="editar" data-id="' + p.id + '">Editar</button>') +
-        '<button class="bt sec peq" data-a="link" data-id="' + p.id + '">Gerar novo link + PIN</button>' +
+        '<button class="bt sec peq" data-a="ver" data-id="' + p.id + '">Ver / reenviar link</button>' +
+        '<button class="bt sec peq" data-a="link" data-id="' + p.id + '">Trocar link (só se vazou)</button>' +
         '<button class="bt sec peq" data-a="pin" data-id="' + p.id + '">Trocar PIN</button>' +
         (p.bloqueado ? '<button class="bt peq" data-a="desbloquear" data-id="' + p.id + '">Desbloquear</button>' : '') +
         (adm ? '' : '<button class="bt sec peq" data-a="ativo" data-id="' + p.id + '">' + (p.ativo ? 'Desativar' : 'Reativar') + '</button><button class="bt perigo peq" data-a="excluir" data-id="' + p.id + '">Excluir</button>') + '</div></div>';
@@ -223,12 +224,12 @@ function listaPessoas(extra) {
 function caixaAcesso(nome, link, pin, titulo) {
   const msg1 = 'Oi, ' + nome + '! Este é o seu link para o painel em tempo real do Bosque: ' + link;
   const msg2 = 'Seu PIN de acesso ao painel do Bosque: ' + pin + ' (não compartilhe).';
-  return '<div class="caixa"><b style="margin-top:0">' + esc(titulo) + ' — guarde agora, o link não aparece de novo</b>' +
-    '<b>Link</b>' + esc(link) + '<b>PIN</b><span class="grande">' + esc(pin || '(não mudou)') + '</span>' +
+  return '<div class="caixa"><b style="margin-top:0">' + esc(titulo) + '</b>' +
+    '<b>Link</b>' + esc(link) + (pin ? '<b>PIN</b><span class="grande">' + esc(pin) + '</span>' : '') +
     '<div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg1) + '">1) Enviar link por WhatsApp</a>' +
     (pin ? '<a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap(msg2) + '">2) Enviar PIN por WhatsApp</a>' : '') +
     '<button class="bt sec peq" data-copiar="' + esc(link) + '">Copiar link</button></div>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Mande o link e o PIN em mensagens separadas (e, de preferência, para a própria pessoa).</p></div>';
+    '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">O link é fixo: a pessoa pode salvar na tela inicial do celular. Você pode ver e reenviar o mesmo link quando quiser em "Ver / reenviar link". Mande o link e o PIN em mensagens separadas.</p></div>';
 }
 async function acaoPessoa(ev) {
   const c = ev.target.closest('[data-copiar]'); if (c) return copiar(c.getAttribute('data-copiar'), c);
@@ -238,7 +239,8 @@ async function acaoPessoa(ev) {
   try {
     if (a === 'nova') return formPessoa(null);
     if (a === 'editar') return formPessoa(p);
-    if (a === 'link') { if (!confirm('Gerar um link novo para ' + p.nome + '? O link antigo para de funcionar e o PIN também muda.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
+    if (a === 'ver') { const j = await chamar('POST', '/api/admin/pessoas/' + id + '/ver-link', {}); if (!j.link) { alert('O link de ' + p.nome + ' foi criado antes de eu guardá-lo. Use "Trocar link" uma única vez; daí em diante ele fica guardado e fixo.'); return; } await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, null, 'Link de ' + p.nome)); return; }
+    if (a === 'link') { if (!confirm('Trocar o link de ' + p.nome + '? O link antigo para de funcionar, o PIN também muda e a pessoa terá de salvar o novo na tela inicial. Só faça isso se o link vazou.')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-link', {}); await abaPessoasRecarrega(caixaAcesso(p.nome, j.link, j.pin, 'Novo acesso de ' + p.nome)); return; }
     if (a === 'pin') { if (!confirm('Trocar o PIN de ' + p.nome + '?')) return; const j = await chamar('POST', '/api/admin/pessoas/' + id + '/novo-pin', {}); await abaPessoasRecarrega('<div class="caixa"><b style="margin-top:0">Novo PIN de ' + esc(p.nome) + '</b><span class="grande">' + esc(j.pin) + '</span><div class="acoes"><a class="bt peq" style="text-decoration:none" target="_blank" href="' + zap('Seu novo PIN do painel do Bosque: ' + j.pin) + '">Enviar PIN por WhatsApp</a></div></div>'); return; }
     if (a === 'desbloquear') { await chamar('POST', '/api/admin/pessoas/' + id + '/desbloquear', {}); return abaPessoasRecarrega(); }
     if (a === 'ativo') { await chamar('POST', '/api/admin/pessoas/' + id + '/atualizar', { ativo: !p.ativo }); return abaPessoasRecarrega(); }

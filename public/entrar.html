@@ -117,6 +117,8 @@
   </form>
 <script>
 const K = decodeURIComponent(location.pathname.replace(/^\/a\//, '').split('/')[0] || '');
+// já está logado neste aparelho (ex.: abriu pelo ícone da tela inicial)? Vai direto para o painel, sem PIN.
+fetch('/api/eu', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.nome) location.replace('/painel'); }).catch(function () {});
 const f = document.getElementById('f'), erro = document.getElementById('erro'), ok = document.getElementById('ok');
 f.onsubmit = async function (e) {
   e.preventDefault(); erro.textContent = '';
