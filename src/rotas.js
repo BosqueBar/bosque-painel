@@ -1,6 +1,6 @@
 // Rotas da tela e da administração (acesso por pessoa). Respostas em JSON; nada de dado pessoal em log.
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
-  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
+  pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, PROV, aguardaTroca, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
@@ -31,7 +31,7 @@ export async function noiteAtual(db) {
 const publica = (p) => ({
   id: p.id, nome: p.nome, modelo: p.modelo, dias: p.dias || [], datas: p.datas || [],
   perm_contagem: p.perm_contagem, perm_bilheteria: p.perm_bilheteria, perm_bar: p.perm_bar,
-  ativo: p.ativo, validade: p.validade, bloqueado: !!(p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()), criado_em: p.criado_em
+  ativo: p.ativo, aguardando_troca: aguardaTroca(p), validade: p.validade, bloqueado: !!(p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()), criado_em: p.criado_em
 });
 
 function normalizar(d, atual) {
@@ -67,17 +67,18 @@ async function entrar(request, env, db) {
   if (!p || !p.ativo) return json({ erro: 'Link inválido ou desativado. Peça um novo à Annie.' }, 403);
   if (p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()) return json({ erro: 'Acesso bloqueado por muitos erros de PIN. Peça à Annie para liberar.' }, 423);
   if (!(await conferePin(pin, p.pin_hash))) {
-    const erros = Math.max(0, p.erros_pin || 0) + 1;
-    const dados = { erros_pin: erros };
+    const prov0 = aguardaTroca(p), antes = (p.erros_pin || 0) >= PROV ? p.erros_pin - PROV : Math.max(0, p.erros_pin || 0);
+    const erros = antes + 1;
+    const dados = { erros_pin: (prov0 ? PROV : 0) + erros };
     if (erros >= 5) dados.bloqueado_ate = BLOQUEIO_FIM;
     await db.upd('pt_pessoas', { id: 'eq.' + p.id }, dados);
     return json({ erro: erros >= 5 ? 'PIN errado 5 vezes: acesso bloqueado. Peça à Annie para liberar.' : 'PIN incorreto. Restam ' + (5 - erros) + ' tentativa(s).' }, 403);
   }
   if (p.validade && p.validade < agoraBR().dia) return json({ erro: 'Este acesso venceu.' }, 403);
-  if (p.erros_pin > 0) await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { erros_pin: 0 });
+  if (p.erros_pin > 0 && p.erros_pin !== PROV) await db.upd('pt_pessoas', { id: 'eq.' + p.id }, { erros_pin: aguardaTroca(p) ? PROV : 0 });
   const { hoje, agora } = await noiteAtual(db);
   await db.ins('pt_acessos', [{ pessoa_id: p.id, aparelho: await rotuloAparelho(request), noite: hoje || agora }]);
-  const prov = !ehAdmin(p) && ((p.erros_pin || 0) < 0 || (await ehProvisorio(db, p.id)));
+  const prov = !ehAdmin(p) && (aguardaTroca(p) || (await ehProvisorio(db, p.id)));
   const cookie = await criarCookie(env, p, new URL(request.url).protocol === 'https:', prov);
   return json({ ok: true, admin: ehAdmin(p), trocar_pin: prov }, 200, { 'Set-Cookie': cookie });
 }
@@ -142,7 +143,7 @@ async function admin(request, url, env, db, p) {
     const pin = b.pin ? String(b.pin) : pinAleatorio();
     if (!pinValido(pin)) throw new Error('O PIN precisa ter 6 números.');
     const chave = novaChaveLink();
-    const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
+    const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin), erros_pin: PROV })], { retorna: true });
     await guardarLink(env, db, novo[0].id, chave);
     await marcarProvisorio(db, novo[0].id, true);
     return json({ pessoa: publica(novo[0]), link: origem + '/a/' + chave, pin });
@@ -150,7 +151,7 @@ async function admin(request, url, env, db, p) {
   if (rota === 'pessoas-exigir-troca' && request.method === 'POST') {
     const todos = ((await db.sel('pt_pessoas', { select: 'id', modelo: 'neq.admin' })) || []);
     if (todos.length) {
-      await db.upd('pt_pessoas', { modelo: 'neq.admin' }, { erros_pin: -1 });
+      await db.upd('pt_pessoas', { modelo: 'neq.admin' }, { erros_pin: PROV });
       await db.ins('pt_config', todos.map((x) => ({ chave: 'pinprov_' + x.id, valor: '1', atualizado_em: new Date().toISOString() })), { upsert: true, conflito: 'chave' });
     }
     return json({ ok: true, total: todos.length });
@@ -184,7 +185,7 @@ async function admin(request, url, env, db, p) {
         const pin = it.pin ? String(it.pin) : pinAleatorio();
         if (!pinValido(pin)) throw new Error('PIN precisa ter 6 números.');
         const chave = novaChaveLink();
-        const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin) })], { retorna: true });
+        const novo = await db.ins('pt_pessoas', [Object.assign(d, { chave_hash: await hashLink(chave), pin_hash: await hashPin(pin), erros_pin: PROV })], { retorna: true });
         await guardarLink(env, db, novo[0].id, chave);
         await marcarProvisorio(db, novo[0].id, true);
         existentes.add(nome.toLowerCase());
@@ -201,7 +202,7 @@ async function admin(request, url, env, db, p) {
     if (!alvo) return json({ erro: 'Pessoa não encontrada.' }, 404);
     if (acao === 'exigir-troca') {
       if (alvo.modelo === 'admin') return json({ erro: 'O administrador escolhe o próprio PIN em "Trocar PIN".' }, 400);
-      await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: -1 }); await marcarProvisorio(db, id, true);
+      await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: PROV }); await marcarProvisorio(db, id, true);
       return json({ ok: true });
     }
     if (acao === 'ver-link') { const k = await lerLink(env, db, id); return json({ link: k ? origem + '/a/' + k : null }); }
@@ -215,6 +216,7 @@ async function admin(request, url, env, db, p) {
       if (alvo.modelo === 'admin' && alvo.id !== p.id) return json({ erro: 'Só o próprio administrador troca o seu link.' }, 403);
       const chave = novaChaveLink();
       const dados = { chave_hash: await hashLink(chave), erros_pin: 0, bloqueado_ate: null };
+      if (b.novo_pin !== false && alvo.modelo !== 'admin') dados.erros_pin = PROV;
       let pin = null;
       if (b.novo_pin !== false) { pin = pinAleatorio(); dados.pin_hash = await hashPin(pin); }
       await db.upd('pt_pessoas', { id: 'eq.' + id }, dados);
@@ -225,11 +227,11 @@ async function admin(request, url, env, db, p) {
     if (acao === 'novo-pin') {
       const pin = b.pin ? String(b.pin) : pinAleatorio();
       if (!pinValido(pin)) throw new Error('O PIN precisa ter 6 números.');
-      await db.upd('pt_pessoas', { id: 'eq.' + id }, { pin_hash: await hashPin(pin), erros_pin: 0, bloqueado_ate: null });
+      await db.upd('pt_pessoas', { id: 'eq.' + id }, { pin_hash: await hashPin(pin), erros_pin: alvo.modelo !== 'admin' ? PROV : 0, bloqueado_ate: null });
       if (alvo.modelo !== 'admin') await marcarProvisorio(db, id, true);
       return json({ pin });
     }
-    if (acao === 'desbloquear') { await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: 0, bloqueado_ate: null }); return json({ ok: true }); }
+    if (acao === 'desbloquear') { await db.upd('pt_pessoas', { id: 'eq.' + id }, { erros_pin: aguardaTroca(alvo) ? PROV : 0, bloqueado_ate: null }); return json({ ok: true }); }
     if (acao === 'excluir') {
       if (alvo.modelo === 'admin') return json({ erro: 'O administrador não pode ser excluído.' }, 403);
       await db.del('pt_pessoas', { id: 'eq.' + id }); await db.del('pt_config', { chave: 'eq.link_' + id }).catch(() => {}); await marcarProvisorio(db, id, false).catch(() => {}); return json({ ok: true });

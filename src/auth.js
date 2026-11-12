@@ -83,12 +83,15 @@ export async function pessoaDaSessao(request, env, db) {
   if (d !== 0) return null;
   if (p.validade && p.validade < new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10)) return null;
   if (p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date()) return null;
-  p._prov = f === '1' || (p.erros_pin || 0) < 0; // erros_pin = -1: a administradora pediu a troca do PIN (vale na hora, até para quem já está logado)
+  p._prov = f === '1' || aguardaTroca(p); // marcado na própria linha da pessoa (vale na hora, até para quem já está logado)
   return p;
 }
 
 // ---------- regras de acesso ----------
 export const ehAdmin = (p) => !!p && p.modelo === 'admin';
+// erros_pin guarda dois dados: de 0 a 4 = PINs errados seguidos; a partir de 100 = "PIN provisório, a pessoa ainda vai escolher o próprio" (100 + erros). Negativo = marca antiga.
+export const PROV = 100;
+export const aguardaTroca = (p) => !!p && ((p.erros_pin || 0) >= PROV || (p.erros_pin || 0) < 0);
 export function podeVerNoite(p, noite) {
   if (!p) return false;
   if (ehAdmin(p)) return true;

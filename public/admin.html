@@ -235,7 +235,7 @@ function conteudoLista() {
       return '<div class="pess"><h3>' + esc(p.nome) + (ONLINE.indexOf(p.id) >= 0 ? ' <span class="chip verde">online agora</span>' : '') + '</h3>' +
         '<div style="font-size:12px;color:var(--text-muted)">' + esc(adm ? 'Administrador' : ((MODELOS[p.modelo] || {}).rotulo || p.modelo)) + ' · ' + resumoDias(p) + (p.validade ? ' · até ' + dataBR(p.validade) : '') + '</div>' +
         '<div class="chips">' + perms.map(function (x) { return '<span class="chip verde">' + x + '</span>'; }).join('') +
-        (p.ativo ? '' : '<span class="chip verm">desativado</span>') + (p.bloqueado ? '<span class="chip verm">bloqueado (PIN errado)</span>' : '') +
+        (p.ativo ? '' : '<span class="chip verm">desativado</span>') + (p.bloqueado ? '<span class="chip verm">bloqueado (PIN errado)</span>' : '') + (p.aguardando_troca ? '<span class="chip" style="background:#FFF9E6;border-color:#E7D49A">aguardando troca de PIN</span>' : '') +
         '<span class="chip">' + (APARELHOS[p.id] || 0) + ' aparelho(s)</span></div>' +
         '<div class="acoes">' + (adm ? '' : '<button class="bt sec peq" data-a="editar" data-id="' + p.id + '">Editar</button>') +
         '<button class="bt sec peq" data-a="ver" data-id="' + p.id + '">Ver / reenviar link</button>' +
