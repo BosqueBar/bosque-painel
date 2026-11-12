@@ -162,10 +162,16 @@ export function proximasNoites(agora, cal, modoAtual) {
 }
 export async function rodarAntecipado(env, db) {
   const agora = agoraBR();
-  if (agora.minuto !== 0) return { pulou: 'só na virada da hora' };
   const cal = await calendarioDb(db);
-  const dias = proximasNoites(agora, cal, decidirModo(agora, cal.extras, cal.fechadas));
+  let dias = proximasNoites(agora, cal, decidirModo(agora, cal.extras, cal.fechadas));
   if (!dias.length) return { dias: [] };
+  if (agora.minuto !== 0) {
+    // fora da virada da hora só lê as noites que ainda não têm painel (primeira leitura, sem esperar a próxima hora)
+    let ja = new Set();
+    try { ja = new Set(((await db.sel('pt_painel', { select: 'noite' })) || []).map((x) => x.noite)); } catch (e) { return { pulou: 'só na virada da hora' }; }
+    dias = dias.filter((d) => !ja.has(d));
+    if (!dias.length) return { pulou: 'só na virada da hora' };
+  }
   try {
     const t = await db.sel('pt_config', { select: 'valor', chave: 'eq.trava_antecipado' });
     if (t && t[0] && Date.now() - Number(t[0].valor) < 600000) return { pulou: 'rodada anterior ainda em andamento' };
