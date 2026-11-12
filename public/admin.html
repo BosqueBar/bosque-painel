@@ -474,7 +474,7 @@ function lerTabela(texto) { // CSV (vírgula) ou colado do Google Sheets (tab); 
   }
   lin.push(cel); if (lin.some(function (x) { return x !== ''; })) linhas.push(lin);
   if (linhas.length < 2) return [];
-  const cab = linhas[0].map(function (x) { return x.trim(); });
+  const cab = linhas[0].map(function (x) { return x.trim().toLowerCase().replace(/\s+/g, '_'); });
   return linhas.slice(1).map(function (l) { const o = {}; cab.forEach(function (k, i) { if (k) o[k] = (l[i] || '').trim(); }); return o; }).filter(function (o) { return /\d/.test(o.data || ''); });
 }
 function abaHistorico() {
@@ -496,7 +496,10 @@ function abaHistorico() {
     btn.disabled = true; btn.textContent = 'Importando…'; document.getElementById('h-erro').textContent = ''; document.getElementById('h-ok').textContent = '';
     try {
       const j = await chamar('POST', '/api/admin/historico', { linhas: linhas });
-      document.getElementById('h-ok').textContent = j.importadas + ' noite(s) importadas' + (j.puladas.length ? ' · puladas (hoje/futuras): ' + j.puladas.join(', ') : '') + '. Veja em Painel → Eventos.';
+      if (!j.importadas) throw new Error('Nenhuma noite foi gravada' + (j.puladas.length ? ' (só havia hoje/futuras: ' + j.puladas.join(', ') + ')' : '') + '. Confira se o cabeçalho foi colado junto.');
+      const conf = await chamar('GET', '/api/noites');
+      const todas = (conf.noites || []).concat(conf.hoje || []);
+      document.getElementById('h-ok').textContent = j.importadas + ' noite(s) gravadas (de ' + j.noites[0] + ' até ' + j.noites[j.noites.length - 1] + ')' + (j.puladas.length ? ' · puladas (hoje/futuras): ' + j.puladas.join(', ') : '') + '. Conferência: o painel agora tem ' + todas.length + ' noite(s) no histórico. Veja em Painel → Eventos.';
     } catch (e) { document.getElementById('h-erro').textContent = e.message; }
     btn.disabled = false; btn.textContent = 'Importar';
   };
