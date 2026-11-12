@@ -388,14 +388,19 @@ async function abaAcessos() {
 // ---------- noites extras ----------
 async function abaNoites() {
   const j = await chamar('GET', '/api/admin/noites');
-  el().innerHTML = '<div class="card"><p class="b-st">Marcar uma noite extra</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Quinta, sexta, sábado e domingo o painel liga sozinho. Para um feriado numa segunda ou outro dia, marque aqui: ele passa a ler as fontes naquela noite (20h–05h). Depois, libere a data para as pessoas em <b>Pessoas → Datas avulsas</b>.</p>' +
+  el().innerHTML = '<div class="card"><p class="b-st">Marcar uma noite extra</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Quinta, sexta, sábado e domingo o painel liga sozinho (a não ser que você marque a noite como fechada). Para um feriado numa segunda ou outro dia, marque aqui: ele passa a ler as fontes naquela noite (20h–05h). Depois, libere a data para as pessoas em <b>Pessoas → Datas avulsas</b>.</p>' +
     '<label class="l">Data</label><input type="date" id="n-dia"><label class="l">Nome do evento (opcional)</label><input id="n-evento" placeholder="Ex.: BOSQUE - SEG - 16/11 (feriado)">' +
     '<p class="erro" id="n-erro"></p><button class="bt" id="n-ok">Marcar noite</button></div>' +
+    '<div class="card"><p class="b-st">Marcar uma noite FECHADA</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Para dias de quinta a domingo em que o Bosque não abre (ex.: 24/12 e 31/12). O painel não lê nada nessa data e ninguém vê uma noite vazia.</p>' +
+    '<label class="l">Data</label><input type="date" id="x-dia"><p class="erro" id="x-erro"></p><button class="bt" id="x-ok">Marcar como fechada</button></div>' +
     '<div class="card"><p class="b-st">Colar o calendário de abertura</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Cole a sua tabela (Data, Dia, Evento). Eu marco sozinho só as datas que <b>não</b> são quinta, sexta, sábado ou domingo; essas quatro já ligam automaticamente.</p>' +
     '<textarea id="c-txt" rows="6" style="width:100%;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;font-family:inherit" placeholder="Cole aqui"></textarea><div id="c-prev"></div><p class="erro" id="c-erro"></p><button class="bt" id="c-ok" disabled>Marcar noites extras</button></div>' +
-    '<div class="card-outline"><p class="b-st">Noites marcadas</p>' + (j.noites.length ? '<table class="t">' + j.noites.map(function (n) { return '<tr><td>' + dataBR(n.dia) + '</td><td>' + esc(n.evento || '') + '</td><td style="text-align:right"><button class="bt perigo peq" data-rm="' + n.dia + '">Remover</button></td></tr>'; }).join('') + '</table>' : '<span style="font-size:13px;color:var(--text-muted)">Nenhuma noite extra.</span>') + '</div>';
+    '<div class="card-outline"><p class="b-st">Noites marcadas</p>' + (j.noites.length ? '<table class="t">' + j.noites.map(function (n) { return '<tr><td>' + dataBR(n.dia) + ' ' + DIAS[new Date(n.dia + 'T12:00:00Z').getUTCDay()] + '</td><td>' + (n.ativa ? esc(n.evento || '') : '<span class="chip verm">FECHADA</span>') + '</td><td style="text-align:right"><button class="bt perigo peq" data-rm="' + n.dia + '">' + (n.ativa ? 'Remover' : 'Reabrir') + '</button></td></tr>'; }).join('') + '</table>' : '<span style="font-size:13px;color:var(--text-muted)">Nenhuma noite extra.</span>') + '</div>';
   document.getElementById('n-ok').onclick = async function () {
     try { await chamar('POST', '/api/admin/noites', { dia: document.getElementById('n-dia').value, evento: document.getElementById('n-evento').value }); abaNoites(); } catch (e) { document.getElementById('n-erro').textContent = e.message; }
+  };
+  document.getElementById('x-ok').onclick = async function () {
+    try { await chamar('POST', '/api/admin/noites', { dia: document.getElementById('x-dia').value, evento: 'Fechado', ativa: false }); abaNoites(); } catch (e) { document.getElementById('x-erro').textContent = e.message; }
   };
   let extras = [];
   document.getElementById('c-txt').oninput = function () {

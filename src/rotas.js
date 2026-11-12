@@ -1,7 +1,7 @@
 // Rotas da tela e da administração (acesso por pessoa). Respostas em JSON; nada de dado pessoal em log.
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
   pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
-import { agoraBR, decidirModo } from './coletor.js';
+import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -18,12 +18,10 @@ function chaveTeste(url, env) { // chave de emergência / testes (ver Etapa 6: r
 }
 async function corpo(request) { try { return await request.json(); } catch (e) { return {}; } }
 
-async function extrasDb(db) {
-  try { const r = await db.sel('pt_noites', { select: 'dia', ativa: 'eq.true' }); return new Set((r || []).map((x) => x.dia)); } catch (e) { return new Set(); }
-}
 export async function noiteAtual(db) {
   const agora = agoraBR();
-  const dec = decidirModo(agora, await extrasDb(db));
+  const cal = await calendarioDb(db);
+  const dec = decidirModo(agora, cal.extras, cal.fechadas);
   return { hoje: dec.modo !== 'off' ? dec.dia : null, agora: agora.dia };
 }
 

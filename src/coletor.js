@@ -23,8 +23,9 @@ export function agoraBR(ms) {
 }
 
 // Decide o que fazer agora: { modo: 'evento'|'standby'|'off', dia }.
-export function decidirModo(agora, extras) {
-  const janela = (dia) => JANELAS[diaSemana(dia)] || (extras.has(dia) ? JANELA_EXTRA : null); // quinta a domingo têm janela própria; o resto só se estiver no calendário
+export function decidirModo(agora, extras, fechadas) {
+  fechadas = fechadas || new Set();
+  const janela = (dia) => fechadas.has(dia) ? null : (JANELAS[diaSemana(dia)] || (extras.has(dia) ? JANELA_EXTRA : null)); // quinta a domingo têm janela própria; o resto só se estiver no calendário
   const hoje = agora.dia, ontem = somarDias(hoje, -1);
   const jh = janela(hoje), jo = janela(ontem);
   if (jh && agora.min >= jh[0] * 60) return { modo: 'evento', dia: hoje };
@@ -121,11 +122,16 @@ async function coletarRestante(env, db, dia, antes, quais, hashes, pular, result
 }
 
 // Chamado pelo agendador a cada minuto.
+// Calendário marcado no admin: noites extras (ativa) e noites fechadas (ativa = false; valem também para quinta a domingo).
+export async function calendarioDb(db) {
+  const extras = new Set(), fechadas = new Set();
+  try { for (const x of (await db.sel('pt_noites', { select: 'dia,ativa' })) || []) (x.ativa ? extras : fechadas).add(x.dia); } catch (e) { /* sem calendário: só as noites normais */ }
+  return { extras, fechadas };
+}
 export async function rodarAgendado(env, db) {
   const agora = agoraBR();
-  let extras = new Set();
-  try { const r = await db.sel('pt_noites', { select: 'dia', ativa: 'eq.true' }); extras = new Set((r || []).map((x) => x.dia)); } catch (e) { /* sem calendário: só as noites normais */ }
-  const dec = decidirModo(agora, extras);
+  const cal = await calendarioDb(db);
+  const dec = decidirModo(agora, cal.extras, cal.fechadas);
   if (dec.modo === 'off') return { modo: 'off' };
   if (dec.modo === 'standby' && agora.minuto % 30 !== 0) return { modo: 'standby', pulou: true }; // standby: 1 leitura a cada 30 min
 
