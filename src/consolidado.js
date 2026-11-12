@@ -17,7 +17,7 @@ export function nomeEventoPadrao(dia) {
   return 'BOSQUE - ' + nomes[new Date(Date.UTC(a, m - 1, d)).getUTCDay()] + ' - ' + String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0');
 }
 
-export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo) {
+export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) {
   const s = sympla || {}, z = zigIng || {}, b = zigBar || {}, u = ugo || {};
 
   let symValF = Math.max(0, (s.qtd_feminino_pago || 0) - (s.falta_entrar_feminino || 0));
@@ -52,7 +52,7 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo) {
   const consumoPorHora = b.consumo_por_hora || {};
 
   return {
-    evento: z.evento_nome || nomeEventoPadrao(dia),
+    evento: nomeEvento || z.evento_nome || nomeEventoPadrao(dia), // nome marcado no calendário (noites extras) vale primeiro
     data: dia,
     pessoas_na_casa: ckUsado + (z.ingressos_validados || 0) + cortValTotal,
     falta_entrar_antecipado: faltaAnt,

@@ -24,7 +24,7 @@ export function agoraBR(ms) {
 
 // Decide o que fazer agora: { modo: 'evento'|'standby'|'off', dia }.
 export function decidirModo(agora, extras) {
-  const janela = (dia) => (extras.has(dia) ? JANELA_EXTRA : JANELAS[diaSemana(dia)]) || null;
+  const janela = (dia) => JANELAS[diaSemana(dia)] || (extras.has(dia) ? JANELA_EXTRA : null); // quinta a domingo têm janela própria; o resto só se estiver no calendário
   const hoje = agora.dia, ontem = somarDias(hoje, -1);
   const jh = janela(hoje), jo = janela(ontem);
   if (jh && agora.min >= jh[0] * 60) return { modo: 'evento', dia: hoje };
@@ -75,7 +75,9 @@ async function atualizarFonte(env, db, dia, fonte, antes, hashes) {
 export async function consolidarNoite(db, dia) {
   const f = await lerFontes(db, dia);
   const d = (n) => (f[n] && f[n].dados) || null;
-  const painel = montarConsolidado(dia, d('sympla'), d('zig_ingressos'), d('zig_bar'), d('ugo'));
+  let nomeEvento = '';
+  try { const nn = await db.sel('pt_noites', { select: 'evento', dia: 'eq.' + dia }); nomeEvento = (nn && nn[0] && nn[0].evento) || ''; } catch (e) { /* sem calendário */ }
+  const painel = montarConsolidado(dia, d('sympla'), d('zig_ingressos'), d('zig_bar'), d('ugo'), nomeEvento);
   const frescor = {};
   for (const n of FONTES) frescor[n] = f[n] ? { atualizado_em: f[n].atualizado_em, tentativa_em: f[n].tentativa_em, erro: f[n].erro || '' } : null;
   painel.fontes = frescor;

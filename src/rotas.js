@@ -228,6 +228,12 @@ async function admin(request, url, env, db, p) {
     await db.ins('pt_noites', [{ dia: b.dia, evento: String(b.evento || '').slice(0, 80), extra: true, ativa: b.ativa !== false }], { upsert: true, conflito: 'dia' });
     return json({ ok: true });
   }
+  if (rota === 'noites-lote' && request.method === 'POST') {
+    const lista = (Array.isArray(b.noites) ? b.noites : []).slice(0, 400).filter((n) => DATA.test(String((n && n.dia) || '')));
+    if (!lista.length) throw new Error('Nenhuma data válida.');
+    await db.ins('pt_noites', lista.map((n) => ({ dia: n.dia, evento: String(n.evento || '').slice(0, 80), extra: true, ativa: true })), { upsert: true, conflito: 'dia' });
+    return json({ ok: true, total: lista.length });
+  }
   if (rota === 'noites/excluir' && request.method === 'POST') {
     if (!DATA.test(String(b.dia || ''))) throw new Error('Data inválida.');
     await db.del('pt_noites', { dia: 'eq.' + b.dia }); return json({ ok: true });

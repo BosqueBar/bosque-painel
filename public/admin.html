@@ -391,9 +391,31 @@ async function abaNoites() {
   el().innerHTML = '<div class="card"><p class="b-st">Marcar uma noite extra</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Quinta, sexta, sábado e domingo o painel liga sozinho. Para um feriado numa segunda ou outro dia, marque aqui: ele passa a ler as fontes naquela noite (20h–05h). Depois, libere a data para as pessoas em <b>Pessoas → Datas avulsas</b>.</p>' +
     '<label class="l">Data</label><input type="date" id="n-dia"><label class="l">Nome do evento (opcional)</label><input id="n-evento" placeholder="Ex.: BOSQUE - SEG - 16/11 (feriado)">' +
     '<p class="erro" id="n-erro"></p><button class="bt" id="n-ok">Marcar noite</button></div>' +
+    '<div class="card"><p class="b-st">Colar o calendário de abertura</p><p style="font-size:13px;color:var(--text-secondary);margin:0">Cole a sua tabela (Data, Dia, Evento). Eu marco sozinho só as datas que <b>não</b> são quinta, sexta, sábado ou domingo; essas quatro já ligam automaticamente.</p>' +
+    '<textarea id="c-txt" rows="6" style="width:100%;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;font-family:inherit" placeholder="Cole aqui"></textarea><div id="c-prev"></div><p class="erro" id="c-erro"></p><button class="bt" id="c-ok" disabled>Marcar noites extras</button></div>' +
     '<div class="card-outline"><p class="b-st">Noites marcadas</p>' + (j.noites.length ? '<table class="t">' + j.noites.map(function (n) { return '<tr><td>' + dataBR(n.dia) + '</td><td>' + esc(n.evento || '') + '</td><td style="text-align:right"><button class="bt perigo peq" data-rm="' + n.dia + '">Remover</button></td></tr>'; }).join('') + '</table>' : '<span style="font-size:13px;color:var(--text-muted)">Nenhuma noite extra.</span>') + '</div>';
   document.getElementById('n-ok').onclick = async function () {
     try { await chamar('POST', '/api/admin/noites', { dia: document.getElementById('n-dia').value, evento: document.getElementById('n-evento').value }); abaNoites(); } catch (e) { document.getElementById('n-erro').textContent = e.message; }
+  };
+  let extras = [];
+  document.getElementById('c-txt').oninput = function () {
+    let ignoradas = 0; extras = [];
+    this.value.split(/\r?\n/).forEach(function (linha) {
+      const cols = linha.split('\t').map(function (x) { return x.trim(); });
+      const m = (cols[0] || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (!m) return;
+      const iso = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+      const dow = new Date(iso + 'T12:00:00Z').getUTCDay();
+      if (dow === 0 || dow >= 4) { ignoradas++; return; }
+      extras.push({ dia: iso, dow: dow, evento: cols[2] || '' });
+    });
+    document.getElementById('c-prev').innerHTML = (extras.length ? '<table class="t" style="margin-top:10px"><tr><th>Data</th><th>Dia</th><th>Evento</th></tr>' + extras.map(function (x) { return '<tr><td>' + dataBR(x.dia) + '</td><td>' + DIAS[x.dow] + '</td><td>' + esc(x.evento) + '</td></tr>'; }).join('') + '</table>' : '') +
+      '<p style="font-size:12px;color:var(--text-muted)">' + extras.length + ' noite(s) extra(s) para marcar' + (ignoradas ? ' · ' + ignoradas + ' data(s) de quinta a domingo ignoradas (já automáticas)' : '') + '.</p>';
+    document.getElementById('c-ok').disabled = !extras.length;
+  };
+  document.getElementById('c-ok').onclick = async function () {
+    this.disabled = true; this.textContent = 'Marcando…';
+    try { await chamar('POST', '/api/admin/noites-lote', { noites: extras.map(function (x) { return { dia: x.dia, evento: x.evento }; }) }); abaNoites(); }
+    catch (e) { document.getElementById('c-erro').textContent = e.message; this.disabled = false; this.textContent = 'Marcar noites extras'; }
   };
   el().onclick = async function (e) { const r = e.target.getAttribute('data-rm'); if (r && confirm('Remover a noite ' + dataBR(r) + '?')) { await chamar('POST', '/api/admin/noites/excluir', { dia: r }); abaNoites(); } };
 }
