@@ -2,6 +2,7 @@
 import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinValido, hashPin, conferePin, criarCookie, cookieSair,
   pessoaDaSessao, podeVerNoite, permissoes, filtrarPainel, guardarTokenZig, guardarTokenIngresso, guardarLink, lerLink, marcarProvisorio, ehProvisorio, lerTokens, DIAS_TOKEN, rotuloAparelho } from './auth.js';
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
+import { somarDias } from './util.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -96,28 +97,31 @@ async function trocarPin(request, env, db, p) {
 // ---------- tela ----------
 async function painelDaPessoa(request, url, env, db, p, legado) {
   const { hoje, agora } = await noiteAtual(db);
+  const ref = hoje || somarDias(agora, -1); // noites depois disso ainda não começaram
   const perm = legado ? { contagem: true, bilheteria: true, bar: true } : permissoes(p);
   const pede = url.searchParams.get('noite') || '';
   let noite = pede;
   if (pede && !DATA.test(pede)) return json({ erro: 'Noite inválida.' }, 400);
   if (!noite) {
-    if (hoje && (legado || podeVerNoite(p, hoje))) noite = hoje;
+    const todas = ((await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 80 })) || []).map((x) => x.noite).filter((n) => legado || podeVerNoite(p, n));
+    if (hoje && todas.includes(hoje)) noite = hoje;
     else {
-      const ult = await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 60 });
-      const ok = (ult || []).map((x) => x.noite).find((n) => legado || podeVerNoite(p, n));
-      noite = ok || '';
+      const proximas = todas.filter((n) => n > ref).sort(); // a mais próxima que a pessoa pode ver
+      noite = proximas[0] || todas.find((n) => n <= ref) || '';
     }
   }
   if (!noite) return json({ hoje: hoje || agora, noite: null, painel: null, sem_noite: true, nome: legado ? 'Teste' : p.nome, admin: legado || ehAdmin(p) });
   if (!legado && !podeVerNoite(p, noite)) return json({ erro: 'Seu acesso não inclui essa noite.' }, 403);
   const r = await db.sel('pt_painel', { select: 'dados', noite: 'eq.' + noite });
   if (!legado) await db.ins('pt_config', [{ chave: 'visto_' + p.id, valor: String(Date.now()), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' }).catch(() => {});
-  return json({ hoje: hoje || agora, ao_vivo: !!hoje && noite === hoje, noite, painel: filtrarPainel((r && r[0] && r[0].dados) || null, perm), nome: legado ? 'Teste' : p.nome, admin: legado || ehAdmin(p) });
+  return json({ hoje: hoje || agora, ao_vivo: !!hoje && noite === hoje, proxima: noite > ref, noite, painel: filtrarPainel((r && r[0] && r[0].dados) || null, perm), nome: legado ? 'Teste' : p.nome, admin: legado || ehAdmin(p) });
 }
 async function noitesDaPessoa(db, p, legado) {
+  const { hoje, agora } = await noiteAtual(db);
+  const ref = hoje || somarDias(agora, -1);
   const r = await db.sel('pt_painel', { select: 'noite,evento:dados->>evento', order: 'noite.desc', limit: 300 });
-  const lista = (r || []).filter((x) => legado || podeVerNoite(p, x.noite)).map((x) => ({ data: x.noite, evento: x.evento || '' }));
-  return json({ noites: lista });
+  const todas = (r || []).filter((x) => legado || podeVerNoite(p, x.noite)).map((x) => ({ data: x.noite, evento: x.evento || '' }));
+  return json({ noites: todas.filter((x) => x.data <= ref), proximas: todas.filter((x) => x.data > ref).sort((a, b) => (a.data > b.data ? 1 : -1)) });
 }
 
 // ---------- administração ----------

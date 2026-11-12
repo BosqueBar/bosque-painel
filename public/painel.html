@@ -119,24 +119,27 @@ function irPara(params) {
 function configurarNav() {
   const nav = document.getElementById('nav-link');
   if (HISTORICO) { nav.textContent = '← Ao vivo'; nav.onclick = function (e) { e.preventDefault(); irPara({}); }; }
-  else if (NOITE && NOITE !== HOJE) { nav.textContent = '← Eventos passados'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
-  else { nav.textContent = 'Eventos passados'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
+  else if (NOITE && NOITE !== HOJE) { nav.textContent = '← Eventos'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
+  else { nav.textContent = 'Eventos'; nav.onclick = function (e) { e.preventDefault(); irPara({ historico: '1' }); }; }
 }
-function renderizarLista(lista) {
-  document.getElementById('nome-evento').textContent = 'Eventos passados';
-  document.getElementById('atualizado').textContent = (lista ? lista.length : 0) + ' evento(s)';
+function renderizarLista(lista, proximas) {
+  document.getElementById('nome-evento').textContent = 'Eventos';
+  const total = (lista ? lista.length : 0) + (proximas ? proximas.length : 0);
+  document.getElementById('atualizado').textContent = total + ' evento(s)';
   const c = document.getElementById('conteudo');
-  if (!lista || !lista.length) { c.innerHTML = '<div class="empty">Nenhum evento encontrado ainda.</div>'; return; }
-  c.innerHTML = lista.map(function (i) {
-    return '<a class="item-lista" href="#" data-data="' + esc(i.data) + '"><p class="nome">' + esc(i.evento || i.data) + '</p><p class="data">' + esc(i.data) + '</p></a>';
-  }).join('');
+  if (!total) { c.innerHTML = '<div class="empty">Nenhum evento encontrado ainda.</div>'; return; }
+  const itens = function (l) { return l.map(function (i) {
+    return '<a class="item-lista" href="#" data-data="' + esc(i.data) + '"><p class="nome">' + esc(i.evento || i.data) + '</p><p class="data">' + esc(i.data.split('-').reverse().join('/')) + '</p></a>';
+  }).join(''); };
+  c.innerHTML = (proximas && proximas.length ? '<p class="section-title">Próximos eventos</p>' + itens(proximas) : '') +
+    (lista && lista.length ? '<p class="section-title" style="margin-top:14px">Eventos passados</p>' + itens(lista) : '');
   Array.prototype.forEach.call(c.querySelectorAll('.item-lista'), function (el) {
     el.onclick = function (e) { e.preventDefault(); irPara({ noite: el.getAttribute('data-data') }); };
   });
 }
-function htmlFontes(fontes, noiteAoVivo) {
+function htmlFontes(fontes, noiteAoVivo, proxima) {
   if (!fontes) return '';
-  return '<div class="fontes">' + Object.keys(NOMES_FONTE).map(function (k) {
+  return '<div class="fontes">' + Object.keys(NOMES_FONTE).filter(function (k) { return !proxima || k === 'sympla' || k === 'ugo'; }).map(function (k) {
     const f = fontes[k];
     if (!f) return '<span class="fonte erro">' + NOMES_FONTE[k] + ': sem leitura</span>';
     let cls = 'fonte', txt = NOMES_FONTE[k] + ' ' + tempoRelativo(f.atualizado_em);
@@ -145,10 +148,31 @@ function htmlFontes(fontes, noiteAoVivo) {
     return '<span class="' + cls + '">' + txt + '</span>';
   }).join('') + '</div>';
 }
-function renderizar(d, hoje, noite, aoVivo) {
+function renderizarProximo(d, perm) {
+  const conteudo = document.getElementById('conteudo');
+  document.getElementById('nome-evento').textContent = d.evento || 'Próximo evento';
+  document.getElementById('atualizado').textContent = 'Atualizado ' + tempoRelativo(d.atualizado_em) + ' · de hora em hora até o evento';
+  const listaNomes = Number(d.lista_convidados) || 0;
+  const falta = Number(d.falta_entrar_antecipado) || 0;
+  const topo = perm.contagem
+    ? '<div class="b-hero"><div><p class="label">Antecipado esperado</p><p class="b-big">' + fmt(falta) + '</p></div>' +
+      '<div class="r"><p class="label">Na lista</p><b>' + fmt(listaNomes) + '</b></div></div>'
+    : '';
+  const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
+    '<div class="b-chip">Antecipado vendido<b>' + fmt(d.quantidade_venda_sympla) + '</b></div>' +
+    '<div class="b-chip">Bilheteria<b>' + fmtMoeda(d.bilheteria_sympla) + '</b></div>' +
+    '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
+  conteudo.innerHTML = '<span class="badge-passado" style="color:var(--teal);border-color:var(--teal)">Próximo evento · só venda antecipada e lista</span>' +
+    htmlFontes(d.fontes, false, true) +
+    ((topo || chips) ? '<div class="card">' + topo + chips + '</div>' : '') +
+    (perm.contagem ? '<div class="card-outline"><p class="b-st">Antecipado por gênero</p><table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
+      '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table></div>' : '');
+}
+function renderizar(d, hoje, noite, aoVivo, proxima) {
   const conteudo = document.getElementById('conteudo');
   if (!d) { conteudo.innerHTML = '<div class="empty">Sem dados ainda para esse evento.</div>'; return; }
   const perm = d.perm || { contagem: true, bilheteria: true, bar: true };
+  if (proxima) return renderizarProximo(d, perm);
   document.getElementById('nome-evento').textContent = d.evento || 'Bosque · painel ao vivo';
   document.getElementById('atualizado').textContent = aoVivo ? 'Atualizado ' + tempoRelativo(d.atualizado_em) : 'Última atualização registrada: ' + tempoRelativo(d.atualizado_em);
 
@@ -266,7 +290,7 @@ async function carregar() {
       if (resp.status === 401) return semSessao(r.erro);
       if (r.trocar_pin) { location.href = '/entrar'; return; }
       if (r.erro) throw new Error(r.erro);
-      renderizarLista(r.noites);
+      renderizarLista(r.noites, r.proximas);
     } else {
       const resp = await fetch('/api/painel' + q + (NOITE ? sep + 'noite=' + encodeURIComponent(NOITE) : ''), { cache: 'no-store' });
       const r = await resp.json();
@@ -276,7 +300,7 @@ async function carregar() {
       HOJE = r.hoje; configurarNav();
       if (r.admin && !CHAVE) { const l = document.getElementById('link-admin'); if (l) l.style.display = ''; }
       if (r.sem_noite) { document.getElementById('nome-evento').textContent = r.nome ? 'Olá, ' + r.nome : 'Painel'; document.getElementById('atualizado').textContent = ''; document.getElementById('conteudo').innerHTML = '<div class="empty">Nenhuma noite liberada para o seu acesso por enquanto.<br>Quando for a sua noite, ela aparece aqui sozinha.</div>'; return; }
-      renderizar(r.painel, r.hoje, r.noite, !!r.ao_vivo);
+      renderizar(r.painel, r.hoje, r.noite, !!r.ao_vivo, !!r.proxima);
     }
   } catch (e) {
     document.getElementById('conteudo').innerHTML = '<div class="empty">Não consegui carregar agora (' + esc(e.message) + '). Tentando de novo em instantes.</div>';

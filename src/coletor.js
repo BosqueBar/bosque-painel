@@ -146,3 +146,35 @@ export async function rodarAgendado(env, db) {
   const r = await coletarNoite(env, db, dec.dia, {});
   return { modo: dec.modo, dia: dec.dia, resultados: r.resultados };
 }
+
+// ---------- noites que ainda vão acontecer: venda antecipada e lista, de hora em hora ----------
+const NOITES_A_FRENTE = 3; // ex.: na quinta já aparecem sexta, sábado e domingo
+export function proximasNoites(agora, cal, modoAtual) {
+  const saida = [];
+  for (let i = 0; i <= NOITES_A_FRENTE; i++) {
+    const dia = somarDias(agora.dia, i);
+    if (cal.fechadas.has(dia)) continue;
+    if (!(JANELAS[diaSemana(dia)] || cal.extras.has(dia))) continue;
+    if (modoAtual && modoAtual.modo !== 'off' && modoAtual.dia === dia) continue; // a noite em andamento já tem a leitura própria
+    saida.push(dia);
+  }
+  return saida;
+}
+export async function rodarAntecipado(env, db) {
+  const agora = agoraBR();
+  if (agora.minuto !== 0) return { pulou: 'só na virada da hora' };
+  const cal = await calendarioDb(db);
+  const dias = proximasNoites(agora, cal, decidirModo(agora, cal.extras, cal.fechadas));
+  if (!dias.length) return { dias: [] };
+  try {
+    const t = await db.sel('pt_config', { select: 'valor', chave: 'eq.trava_antecipado' });
+    if (t && t[0] && Date.now() - Number(t[0].valor) < 600000) return { pulou: 'rodada anterior ainda em andamento' };
+    await db.ins('pt_config', [{ chave: 'trava_antecipado', valor: String(Date.now()), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
+  } catch (e) { /* sem trava: segue */ }
+  const resultados = {};
+  for (const dia of dias) {
+    try { resultados[dia] = (await coletarNoite(env, db, dia, { forcar: true, fontes: ['sympla', 'ugo'] })).resultados; }
+    catch (e) { resultados[dia] = { erro: String((e && e.message) || e) }; }
+  }
+  return { dias, resultados };
+}

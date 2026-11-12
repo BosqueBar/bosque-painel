@@ -5,7 +5,7 @@ import { coletarSympla } from './fontes/sympla.js';
 import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
-import { coletarNoite, rodarAgendado } from './coletor.js';
+import { coletarNoite, rodarAgendado, rodarAntecipado } from './coletor.js';
 import { api } from './rotas.js';
 import { envComTokens } from './auth.js';
 
@@ -108,6 +108,9 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
       try { await rodarAgendado(env, criarDb(env)); } catch (e) { console.log('coleta falhou: ' + (e && e.message || e)); }
+    })());
+    ctx.waitUntil((async () => { // noites que ainda vão acontecer (antecipado e lista), de hora em hora
+      try { await rodarAntecipado(env, criarDb(env)); } catch (e) { console.log('antecipado falhou: ' + (e && e.message || e)); }
     })());
   }
 };
