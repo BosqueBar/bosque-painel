@@ -39,7 +39,14 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
   const ckApi = s.checkin_realizados || 0, ckUgo = u.sympla_entradas || 0;
   const ckUsado = Math.max(ckApi, ckUgo);
   const ugoAcima = ckUgo > ckApi;
-  const extraSympla = s.ingressos_estimados_sem_lista || 0; // ingressos que a Sympla não lista (pedidos sem participante), estimados
+  // Ingressos que a lista de participantes da Sympla não traz (pedidos sem participante): vale a contagem REAL da UGO (que recebe todos os ingressos da Sympla);
+  // sem ela (ou se vier fora do razoável), usa a estimativa por média de ingressos por pedido.
+  const listaSy = s.quantidade_venda_sympla || 0, estSy = s.ingressos_estimados_sem_lista || 0, ugoSy = u.sympla_ingressos_total || 0;
+  let extraSympla = 0, fonteSympla = '';
+  if (estSy > 0 || ugoSy > listaSy) {
+    if (ugoSy >= listaSy && ugoSy - listaSy <= Math.max(estSy * 1.5, 30)) { extraSympla = ugoSy - listaSy; fonteSympla = 'ugo'; }
+    else { extraSympla = estSy; fonteSympla = 'estimativa'; }
+  }
   let faltaAnt = (s.checkin_restantes || 0) + extraSympla, faltaAntF = s.falta_entrar_feminino || 0, faltaAntM = s.falta_entrar_masculino || 0;
   if (ugoAcima) {
     symValF = u.sympla_entradas_f || 0;
@@ -68,6 +75,7 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
     bilheteria_porta: z.total_vendas || 0,
     quantidade_venda_sympla: (s.quantidade_venda_sympla || 0) + extraSympla,
     venda_sympla_estimada: extraSympla,
+    venda_sympla_fonte: fonteSympla,
     quantidade_checkin_sympla: ckUsado,
     quantidade_cortesia_validada_sympla: symCortTotal,
     quantidade_venda_porta: z.ingressos_emitidos || 0,

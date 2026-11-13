@@ -159,7 +159,7 @@ function renderizarProximo(d, perm) {
       '<div class="r"><p class="label">Na lista</p><b>' + fmt(listaNomes) + '</b></div></div>'
     : '';
   const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
-    '<div class="b-chip">Antecipado vendido<b>' + (Number(d.venda_sympla_estimada) > 0 ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</b></div>' +
+    '<div class="b-chip">Antecipado vendido<b>' + (Number(d.venda_sympla_estimada) > 0 && d.venda_sympla_fonte !== 'ugo' ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</b></div>' +
     '<div class="b-chip">Bilheteria<b>' + fmtMoeda(d.bilheteria_sympla) + '</b></div>' +
     '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
   conteudo.innerHTML = '<span class="badge-passado" style="color:var(--teal);border-color:var(--teal)">Próximo evento · só venda antecipada e lista</span>' +
@@ -197,7 +197,7 @@ function renderizar(d, hoje, noite, aoVivo, proxima) {
       '<div><p class="label">Na casa</p><p class="b-big">' + fmt(d.pessoas_na_casa) + '</p></div>' +
       '<div class="r"><p class="label">Falta entrar</p><b>' + fmt(d.falta_entrar_antecipado) + '</b></div></div>' : '';
   const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
-      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + (Number(d.venda_sympla_estimada) > 0 ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
+      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + (Number(d.venda_sympla_estimada) > 0 && d.venda_sympla_fonte !== 'ugo' ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
       '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
       '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
 

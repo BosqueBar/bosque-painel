@@ -67,14 +67,15 @@ export function contarCortesiaLista(convites, dia) {
 // Ingressos da UGO COM check-in cujo e-mail (em hash) é de comprador da Sympla. Pago tem prioridade se o e-mail estiver nos dois.
 export async function contarSymplaPorHash(ingressos, hashPagos, hashCortesia, dia) {
   const r = { sympla_entradas: 0, sympla_entradas_f: 0, sympla_entradas_m: 0, sympla_entradas_sem_genero: 0,
-    sympla_cortesia_entradas: 0, sympla_cortesia_f: 0, sympla_cortesia_m: 0, sympla_cortesia_sem_genero: 0, horas_sympla: {} };
+    sympla_ingressos_total: 0, sympla_cortesia_entradas: 0, sympla_cortesia_f: 0, sympla_cortesia_m: 0, sympla_cortesia_sem_genero: 0, horas_sympla: {} };
   const pagos = new Set(hashPagos || []), cort = new Set(hashCortesia || []);
   for (const t of ingressos || []) {
-    if (!t.checkin || !t.checkin.length) continue;
     const e = String(t.accountEmail || '').trim().toLowerCase();
     if (!e) continue;
     const h = await sha256(e);
     const ePago = pagos.has(h), eCort = cort.has(h);
+    if (ePago) r.sympla_ingressos_total++; // todos os ingressos da UGO de compradores da Sympla (entrando ou não): serve para conferir o total vendido
+    if (!t.checkin || !t.checkin.length) continue;
     if (!ePago && !eCort) continue;
     const g = classificarGeneroPorNome(t.name);
     const primeira = t.checkin.map((c) => String(c.registerAt || '')).filter(Boolean).sort()[0];
