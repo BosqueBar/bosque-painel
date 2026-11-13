@@ -214,11 +214,41 @@ function renderizar(d, hoje, noite, aoVivo, proxima) {
       '<tr><td>Cortesia validada</td><td class="n">' + fmt(cvF) + '</td><td class="n">' + fmt(cvM) + '</td></tr>' +
       '<tr><td>Falta entrar (antecipado)</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table>' +
       (cvS ? '<p class="b-nota">+ ' + fmt(cvS) + ' cortesia sem gênero identificado</p>' : '') + '</div>' : '') +
+    (perm.contagem ? htmlOrigem(d, perm) : '') +
     (perm.contagem && listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table">' +
       '<tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' +
       '<tr><td>Entraram</td><td class="n">' + fmt(listaEntraram) + '</td></tr>' +
       '<tr><td>Conversão</td><td class="n"><strong>' + pctConversaoLista + '%</strong></td></tr></table></div>' : '') +
     graficos;
+}
+
+// ---- de onde veio cada pessoa que entrou ----
+function htmlOrigem(d, perm) {
+  const n = (k) => Number(d[k]) || 0;
+  const cortSym = n('origem_cortesia_sympla'), cortPorta = n('origem_cortesia_porta'), cortLista = n('origem_cortesia_lista');
+  const linhas = [
+    ['Sympla (pago)', n('origem_sympla_pago')],
+    ['Bilheteria / porta (pago)', n('origem_porta_pago')],
+    ['Lista que pagou', n('origem_lista_paga')],
+    ['Cortesia', cortSym + cortPorta + cortLista]
+  ];
+  const total = linhas[0][1] + linhas[1][1] + linhas[3][1];
+  const maximo = Math.max.apply(null, linhas.map(function (l) { return l[1]; }).concat([1]));
+  const barra = function (v) { return '<div style="height:6px;border-radius:3px;background:var(--border);margin-top:4px"><div style="height:6px;border-radius:3px;background:#2B4E2F;width:' + Math.round(v / maximo * 100) + '%"></div></div>'; };
+  let h = '<div class="card-outline"><p class="b-st">Por onde entrou</p><table class="b-table">' +
+    linhas.map(function (l) { return '<tr><td>' + l[0] + barra(l[1]) + '</td><td class="n">' + fmt(l[1]) + '</td></tr>'; }).join('') + '</table>';
+  const partes = [];
+  if (cortSym) partes.push('Sympla ' + fmt(cortSym));
+  if (cortPorta) partes.push('porta ' + fmt(cortPorta));
+  if (cortLista) partes.push('lista ' + fmt(cortLista));
+  if (partes.length) h += '<p class="b-nota">Cortesia: ' + partes.join(' · ') + '</p>';
+  if (n('origem_lista_paga')) h += '<p class="b-nota">“Lista que pagou” = nome na lista (UGO) que entrou sem ser cortesia.</p>';
+  const lotes = perm.bilheteria && Array.isArray(d.porta_lotes) ? d.porta_lotes : [];
+  if (lotes.length) {
+    h += '<p class="b-st" style="margin-top:14px">Porta por lote</p><table class="b-table"><tr><th></th><th>Qtd</th><th>Valor</th></tr>' +
+      lotes.map(function (l) { return '<tr><td>' + esc(l.lote) + '</td><td class="n">' + fmt(l.qtd) + '</td><td class="n">' + fmtMoeda(l.valor) + '</td></tr>'; }).join('') + '</table>';
+  }
+  return h + '</div>';
 }
 
 // ---- gráficos por hora (entrada e consumo) ----

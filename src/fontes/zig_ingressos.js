@@ -52,7 +52,13 @@ export async function coletarZigIngressos(env, dia) {
   const porHora = {};
   for (const t of itens) { const h = horaDaNoite(String(t.purchase_date || '').substring(0, 19), dia); if (h) porHora[h] = (porHora[h] || 0) + 1; }
 
+  // por lote: mostra, por exemplo, quem entrou num lote "lista" pagando mais barato na porta
+  const lotes = {};
+  for (const t of pagos) { const n = String(t.lot_name || 'Sem lote').trim() || 'Sem lote'; const l = lotes[n] || (lotes[n] = { lote: n, qtd: 0, valor: 0 }); l.qtd++; l.valor += Number(t.price) || 0; }
+  const porta_lotes = Object.values(lotes).sort((a, b) => b.qtd - a.qtd).slice(0, 12);
+
   return {
+    porta_lotes,
     evento_nome: itens[0].event_name, data_primeira_compra: String(itens[0].purchase_date || '').substring(0, 10), dia,
     ingressos_emitidos: total != null ? total : itens.length,
     ingressos_validados: pagos.length,

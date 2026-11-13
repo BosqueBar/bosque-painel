@@ -39,7 +39,7 @@ export function classificarGeneroPorNome(nome) {
 
 /* ===================== CONTAGENS (funções puras) ===================== */
 export function contarCortesiaLista(convites, dia) {
-  const r = { emitidas: 0, validadas: 0, validadas_f: 0, validadas_m: 0, validadas_sem_genero: 0, lista_convidados: 0, lista_entraram: 0, horas_lista: {}, origens_entradas: {} };
+  const r = { emitidas: 0, validadas: 0, validadas_f: 0, validadas_m: 0, validadas_sem_genero: 0, lista_convidados: 0, lista_entraram: 0, lista_pagantes_entraram: 0, horas_lista: {}, origens_entradas: {} };
   const vistos = new Set();
   for (const c of convites || []) {
     if (String(c.inviteStatus || '').toUpperCase() !== 'APPROVED') continue;
@@ -47,6 +47,7 @@ export function contarCortesiaLista(convites, dia) {
     const entrou = !!c.checkInAt;
     if (entrou) r.origens_entradas[origem] = (r.origens_entradas[origem] || 0) + 1;
     if (origem === 'lista') { r.lista_convidados++; if (entrou) r.lista_entraram++; }
+    if (origem === 'lista' && c.courtesy !== true && entrou) r.lista_pagantes_entraram++;
     if (origem === 'lista' && c.courtesy === true) {
       r.emitidas++;
       if (!entrou) continue;
