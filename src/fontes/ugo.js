@@ -134,6 +134,7 @@ export async function coletarUgo(env, db, dia, hashes) {
     try {
       const ing = await get(env, '/api/v1/ticket/event/' + uid);
       Object.assign(r, await contarSymplaPorHash(ing.data || [], hashes.pagos, hashes.cortesia, dia));
+      r.ugo_ingressos_api = (ing.data || []).length; // diagnóstico: total de ingressos que a UGO devolve (sem cruzar e-mail)
     } catch (e) { r.aviso_ingressos_sympla = 'UGO (ingressos Sympla) falhou: ' + e.message + ' — manter o último valor guardado'; }
   }
   return r;
