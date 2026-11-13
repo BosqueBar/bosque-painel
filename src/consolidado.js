@@ -39,7 +39,8 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
   const ckApi = s.checkin_realizados || 0, ckUgo = u.sympla_entradas || 0;
   const ckUsado = Math.max(ckApi, ckUgo);
   const ugoAcima = ckUgo > ckApi;
-  let faltaAnt = s.checkin_restantes || 0, faltaAntF = s.falta_entrar_feminino || 0, faltaAntM = s.falta_entrar_masculino || 0;
+  const extraSympla = s.ingressos_estimados_sem_lista || 0; // ingressos que a Sympla não lista (pedidos sem participante), estimados
+  let faltaAnt = (s.checkin_restantes || 0) + extraSympla, faltaAntF = s.falta_entrar_feminino || 0, faltaAntM = s.falta_entrar_masculino || 0;
   if (ugoAcima) {
     symValF = u.sympla_entradas_f || 0;
     symValM = u.sympla_entradas_m || 0;
@@ -65,7 +66,8 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
     bilheteria_total: (s.valor_vendas_liquido || 0) + (z.total_vendas || 0),
     bilheteria_sympla: s.valor_vendas_liquido || 0,
     bilheteria_porta: z.total_vendas || 0,
-    quantidade_venda_sympla: s.quantidade_venda_sympla || 0,
+    quantidade_venda_sympla: (s.quantidade_venda_sympla || 0) + extraSympla,
+    venda_sympla_estimada: extraSympla,
     quantidade_checkin_sympla: ckUsado,
     quantidade_cortesia_validada_sympla: symCortTotal,
     quantidade_venda_porta: z.ingressos_emitidos || 0,

@@ -159,12 +159,12 @@ function renderizarProximo(d, perm) {
       '<div class="r"><p class="label">Na lista</p><b>' + fmt(listaNomes) + '</b></div></div>'
     : '';
   const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
-    '<div class="b-chip">Antecipado vendido<b>' + fmt(d.quantidade_venda_sympla) + '</b></div>' +
+    '<div class="b-chip">Antecipado vendido<b>' + (Number(d.venda_sympla_estimada) > 0 ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</b></div>' +
     '<div class="b-chip">Bilheteria<b>' + fmtMoeda(d.bilheteria_sympla) + '</b></div>' +
     '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
   conteudo.innerHTML = '<span class="badge-passado" style="color:var(--teal);border-color:var(--teal)">Próximo evento · só venda antecipada e lista</span>' +
     htmlFontes(d.fontes, false, true) +
-    ((topo || chips) ? '<div class="card">' + topo + chips + '</div>' : '') +
+    ((topo || chips) ? '<div class="card">' + topo + chips + ((perm.bilheteria && Number(d.venda_sympla_estimada) > 0) ? '<p class="b-nota" style="margin:10px 0 0">≈ A Sympla não lista os ingressos de alguns pedidos; ' + fmt(d.venda_sympla_estimada) + ' ingressos foram estimados. O valor em R$ é exato.</p>' : '') + '</div>' : '') +
     (perm.contagem ? '<div class="card-outline"><p class="b-st">Antecipado por gênero</p><table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
       '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table></div>' : '');
 }
@@ -197,14 +197,15 @@ function renderizar(d, hoje, noite, aoVivo, proxima) {
       '<div><p class="label">Na casa</p><p class="b-big">' + fmt(d.pessoas_na_casa) + '</p></div>' +
       '<div class="r"><p class="label">Falta entrar</p><b>' + fmt(d.falta_entrar_antecipado) + '</b></div></div>' : '';
   const chips = perm.bilheteria ? '<div class="b-chips"' + (perm.contagem ? '' : ' style="margin-top:0;padding-top:0;border-top:0"') + '>' +
-      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
+      '<div class="b-chip">Antecipado<b>' + fmt(d.quantidade_checkin_sympla) + ' <em>/ ' + (Number(d.venda_sympla_estimada) > 0 ? '≈' : '') + fmt(d.quantidade_venda_sympla) + '</em></b></div>' +
       '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
       '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
 
+  const notaEst = (perm.bilheteria && Number(d.venda_sympla_estimada) > 0) ? '<p class="b-nota" style="margin:10px 0 0">≈ A Sympla não lista os ingressos de alguns pedidos; ' + fmt(d.venda_sympla_estimada) + ' ingressos foram estimados. O valor em R$ é exato.</p>' : '';
   conteudo.innerHTML =
     (!aoVivo ? '<span class="badge-passado">Evento passado</span>' : '') +
     htmlFontes(d.fontes, aoVivo) +
-    ((heroTopo || chips) ? '<div class="card">' + heroTopo + chips + '</div>' : '') +
+    ((heroTopo || chips) ? '<div class="card">' + heroTopo + chips + notaEst + '</div>' : '') +
     dinheiro +
     (perm.contagem ? '<div class="card-outline"><p class="b-st">Gênero</p>' +
       '<div class="bar"><div class="bar-pink" style="width:' + pctFem + '%"></div><div class="bar-blue" style="width:' + pctMasc + '%"></div></div>' +

@@ -149,7 +149,7 @@ export async function coletarSympla(env, db, dia) {
     if (pedidos.every((o) => q(o) !== null)) ingressosNosPedidos = pedidos.filter((o) => o.order_status === 'APPROVED').reduce((a, o) => a + q(o), 0);
   }
   // diagnóstico dos pedidos que NÃO aparecem na lista de participantes (só contagens e datas, nada de pessoas)
-  let faltantes = null;
+  let faltantes = null, estimadosSemLista = 0;
   if (Array.isArray(pedidos) && pedidos.length) {
     const comPart = new Set(todosPart.map((p) => String(p.order_id !== undefined ? p.order_id : '')));
     const aprov = pedidos.filter((o) => o.order_status === 'APPROVED');
@@ -160,6 +160,18 @@ export async function coletarSympla(env, db, dia) {
       const d = String(o.approved_date || o.order_date || ''); if (d && (!minD || d < minD)) minD = d; if (d && d > maxD) maxD = d;
       valorFalta += Number(o.order_total_net_value) || 0;
     }
+    // quem comprou nesses pedidos também precisa ser reconhecido na catraca (cruzamento por e-mail com a UGO)
+    const ja = new Set(hashPagos);
+    for (const o of falta) {
+      const em = String(o.buyer_email || '').trim().toLowerCase();
+      if (!em) continue;
+      const h = await sha256(em);
+      if (!ja.has(h)) { ja.add(h); hashPagos.push(h); }
+    }
+    // estimativa dos ingressos desses pedidos: média de ingressos por pedido entre os pedidos que TÊM lista
+    const pedidosComLista = aprov.length - falta.length;
+    const pagosLista = part.filter((p) => !(Number(p.ticket_sale_price) === 0 || (p.ticket_name && String(p.ticket_name).toLowerCase().includes('cortesia')))).length;
+    estimadosSemLista = pedidosComLista > 0 ? Math.round(falta.length * (pagosLista / pedidosComLista)) : 0;
     let amostra = null;
     if (falta.length) {
       try { const x = await buscarJson(BASE + '/events/' + ids[0] + '/orders/' + falta[0].id + '/participants', { headers: { s_token: token } }, 15000); amostra = { ok: true, participantes: (x.data || []).length }; }
@@ -180,6 +192,6 @@ export async function coletarSympla(env, db, dia) {
     qtd_feminino: qtdF, qtd_masculino: qtdM, qtd_feminino_pago: qtdFPago, qtd_masculino_pago: qtdMPago,
     antecipado_lotes: Object.values(lotesAnt).map((l) => ({ lote: l.lote, vendidos: l.vendidos, entraram: l.entraram, valor: Math.round(l.valor * 100) / 100 })).sort((a, b) => b.vendidos - a.vendidos).slice(0, 12),
     cortesias, pedidos_nao_aprovados: Object.values(naoAprovados).reduce((a, b) => a + b, 0),
-    hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia
+    ingressos_estimados_sem_lista: estimadosSemLista, hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia
   };
 }
