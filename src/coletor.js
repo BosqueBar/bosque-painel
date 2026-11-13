@@ -34,6 +34,9 @@ export function decidirModo(agora, extras, fechadas) {
   return { modo: 'off', dia: hoje };
 }
 
+// A data é uma noite de evento? (quinta a domingo, ou noite extra marcada; nunca uma noite fechada)
+export function ehNoiteDeEvento(dia, cal) { return !cal.fechadas.has(dia) && !!(JANELAS[diaSemana(dia)] || cal.extras.has(dia)); }
+
 async function lerFontes(db, dia) {
   const rows = await db.sel('pt_fontes', { noite: 'eq.' + dia });
   const m = {};

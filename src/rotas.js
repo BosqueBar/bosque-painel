@@ -4,6 +4,7 @@ import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinVa
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
+import { noitesAnteriores, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -280,10 +281,17 @@ async function admin(request, url, env, db, p) {
     const tk = await lerTokens(env, db);
     return json({
       noite, ao_vivo: !!hoje,
+      exportacao: { configurada: exportarConfigurado(env), ultimo: await (async () => { try { const s = await db.sel('pt_config', { select: 'valor', chave: 'eq.exportar_status' }); return s && s[0] ? JSON.parse(s[0].valor) : null; } catch (e) { return null; } })() },
       fontes: (f || []).map((x) => ({ fonte: x.fonte, atualizado_em: x.atualizado_em, tentativa_em: x.tentativa_em, erro: x.erro })),
       token_zig: { guardado: !!tk.zig_token, atualizado_em: tk.zig_token ? tk.zig_token.atualizado_em : null, variavel_antiga: !!env.ZIG_TOKEN },
       tokens_porta: DIAS_TOKEN.map((d) => ({ dia: d, guardado: !!tk['st_token_' + d], atualizado_em: tk['st_token_' + d] ? tk['st_token_' + d].atualizado_em : null, variavel_antiga: !!env['SUPERTICKET_TOKEN_' + d] }))
     });
+  }
+  if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes
+    const hoje = agoraBR().dia, cal = await calendarioDb(db);
+    const dias = Array.isArray(b.dias) && b.dias.length ? b.dias.filter((d) => DATA.test(String(d))).slice(0, 10) : noitesAnteriores(hoje, cal, 7);
+    const r = await enviarParaPlanilha(env, db, dias);
+    return json({ dias, resultado: r });
   }
   if (rota === 'tokens-porta' && request.method === 'POST') {
     const dia = String(b.dia || '').toUpperCase();

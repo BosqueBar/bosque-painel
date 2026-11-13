@@ -6,6 +6,7 @@ import { coletarZigIngressos } from './fontes/zig_ingressos.js';
 import { coletarZigBar } from './fontes/zig_bar.js';
 import { coletarUgo } from './fontes/ugo.js';
 import { coletarNoite, rodarAgendado, rodarAntecipado } from './coletor.js';
+import { rodarExportacao } from './exportar.js';
 import { api } from './rotas.js';
 import { envComTokens } from './auth.js';
 
@@ -106,6 +107,12 @@ export default {
 
   // A cada minuto: decide se é horário de evento e lê as fontes (cada uma separada, com o último dado bom guardado).
   async scheduled(event, env, ctx) {
+    if (event.cron === '10 8 * * *' || event.cron === '0 13 * * *') { // 5h10 e 10h de Brasília: grava na planilha
+      ctx.waitUntil((async () => {
+        try { await rodarExportacao(env, criarDb(env), event.cron === '10 8 * * *' ? 'fechamento' : 'refaz'); } catch (e) { console.log('exportação falhou: ' + (e && e.message || e)); }
+      })());
+      return;
+    }
     ctx.waitUntil((async () => {
       try { await rodarAgendado(env, criarDb(env)); } catch (e) { console.log('coleta falhou: ' + (e && e.message || e)); }
     })());

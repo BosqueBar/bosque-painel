@@ -9,7 +9,7 @@
     "not_found_handling": "none"
   },
   // Coletor: a Cloudflare chama o Worker a cada 1 minuto. Fora do horário de evento ele só confere e volta.
-  "triggers": { "crons": ["* * * * *"] },
+  "triggers": { "crons": ["* * * * *", "10 8 * * *", "0 13 * * *"] }, // + gravação na planilha: 5h10 (fechamento) e 10h de Brasília (refaz as últimas noites)
   "keep_vars": true,
   "observability": { "enabled": true }
 }
