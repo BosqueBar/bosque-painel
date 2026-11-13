@@ -276,13 +276,14 @@ async function admin(request, url, env, db, p) {
     await db.del('pt_noites', { dia: 'eq.' + b.dia }); return json({ ok: true });
   }
   if (rota === 'fontes' && request.method === 'GET') {
+    const cal0 = await calendarioDb(db);
     const { hoje, agora } = await noiteAtual(db);
     let noite = hoje;
     if (!noite) { const u = await db.sel('pt_painel', { select: 'noite', order: 'noite.desc', limit: 1 }); noite = (u && u[0] && u[0].noite) || agora; }
     const f = await db.sel('pt_fontes', { noite: 'eq.' + noite });
     const tk = await lerTokens(env, db);
     return json({
-      noite, ao_vivo: !!hoje,
+      noite, ao_vivo: !!hoje, limite_min: (() => { const c = decidirModo(agoraBR(), cal0.extras, cal0.fechadas); return c.modo === 'evento' ? 3 : 35; })(),
       exportacao: { configurada: exportarConfigurado(env), ultimo: await (async () => { try { const s = await db.sel('pt_config', { select: 'valor', chave: 'eq.exportar_status' }); return s && s[0] ? JSON.parse(s[0].valor) : null; } catch (e) { return null; } })() },
       fontes: (f || []).map((x) => ({ fonte: x.fonte, atualizado_em: x.atualizado_em, tentativa_em: x.tentativa_em, erro: x.erro })),
       token_zig: { guardado: !!tk.zig_token, atualizado_em: tk.zig_token ? tk.zig_token.atualizado_em : null, variavel_antiga: !!env.ZIG_TOKEN },
@@ -297,12 +298,18 @@ async function admin(request, url, env, db, p) {
   }
   if (rota === 'sympla-eventos' && request.method === 'POST') { // escolhe quais eventos somar e relê a Sympla da noite agora
     const dia = String(b.dia || '');
-    const ids = (Array.isArray(b.ids) ? b.ids : []).map((x) => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
-    if (!DATA.test(dia) || !ids.length) throw new Error('Escolha a data e pelo menos um evento.');
+    if (!DATA.test(dia)) throw new Error('Data inválida.');
+    if (!env.SYMPLA_TOKEN) throw new Error('Falta o token da Sympla na Cloudflare.');
+    const validos = new Set((await eventosDaData(env.SYMPLA_TOKEN, dia)).map((e) => e.id)); // só aceita códigos que a Sympla realmente listou nessa data
+    const ids = (Array.isArray(b.ids) ? b.ids : []).map((x) => String(x).trim()).filter((x) => validos.has(x));
+    if (!ids.length) throw new Error('Escolha pelo menos um evento da lista.');
     await db.ins('pt_config', [{ chave: 'sympla_evento_' + dia, valor: ids.join(','), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
     const rr = await coletarNoite(env, db, dia, { forcar: true, fontes: ['sympla', 'ugo'] });
-    const sy = (rr.painel && rr.painel.quantidade_venda_sympla) || 0;
-    return json({ ok: true, dia, ids, vendidos: sy, bilheteria_sympla: (rr.painel && rr.painel.bilheteria_sympla) || 0, resultado: rr.resultados && rr.resultados.sympla });
+    const f = await db.sel('pt_fontes', { select: 'dados,erro,atualizado_em', noite: 'eq.' + dia, fonte: 'eq.sympla' });
+    const x = (f && f[0]) || {}, d = x.dados || {};
+    if (x.erro) throw new Error('A Sympla não respondeu: ' + x.erro);
+    return json({ ok: true, dia, ids, vendidos: d.quantidade_venda_sympla || 0, bilheteria_sympla: d.valor_vendas_liquido || 0,
+      participantes_na_api: d.participantes_brutos || 0, pedidos_na_api: d.pedidos_na_api, status_nao_aprovados: d.status_nao_aprovados || {}, nao_aprovados: d.pedidos_nao_aprovados || 0, cortesias: d.cortesias || 0, valor_origem: d.valor_origem, aviso: d.aviso || '' });
   }
   if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes
     const hoje = agoraBR().dia, cal = await calendarioDb(db);

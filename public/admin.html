@@ -512,12 +512,12 @@ async function abaSaude() {
   const linhas = Object.keys(NOME).map(function (k) {
     const f = j.fontes.find(function (x) { return x.fonte === k; });
     if (!f) return '<tr><td>' + NOME[k] + '</td><td><span class="chip verm">sem leitura</span></td><td></td></tr>';
-    const m = minutos(f.atualizado_em), velha = j.ao_vivo && (m === null || m > 3);
+    const m = minutos(f.atualizado_em), velha = j.ao_vivo && (m === null || m > (j.limite_min || 3));
     const estado = f.erro ? '<span class="chip verm">falha</span>' : (velha ? '<span class="chip verm">atrasada</span>' : '<span class="chip verde">ok</span>');
     return '<tr><td>' + NOME[k] + '</td><td>' + estado + '</td><td>' + (m === null ? 'nunca' : 'há ' + m + ' min') + (f.erro ? '<br><span style="color:#B3261E">' + esc(f.erro) + '</span>' : '') + '</td></tr>';
   }).join('');
   el().innerHTML = '<div class="card"><p class="b-st">Fontes da noite ' + dataBR(j.noite) + (j.ao_vivo ? ' (ao vivo)' : ' (fora do horário de evento)') + '</p><table class="t"><tr><th>Fonte</th><th>Estado</th><th>Última leitura</th></tr>' + linhas + '</table>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Ao vivo, a fonte fica "atrasada" se passar de 3 minutos sem ler. Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoSympla(j.noite) + cartaoPlanilha(j.exportacao);
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Durante o evento, a fonte fica "atrasada" se passar de 3 minutos sem ler (antes da abertura, a leitura é a cada 30 minutos). Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoSympla(j.noite) + cartaoPlanilha(j.exportacao);
   document.getElementById('bt-exportar').onclick = enviarPlanilha;
   document.getElementById('bt-sy-ver').onclick = verEventosSympla;
 }
@@ -541,7 +541,7 @@ async function verEventosSympla() {
       const b2 = document.getElementById('res-sy2'); if (!ids.length) { b2.textContent = 'Marque pelo menos um evento.'; return; }
       b2.textContent = 'Lendo a Sympla…';
       chamar('POST', '/api/admin/sympla-eventos', { dia: dia, ids: ids }).then(function (x) {
-        b2.innerHTML = '<b>Pronto.</b> Vendidos: ' + x.vendidos + ' · Bilheteria Sympla: R$ ' + Number(x.bilheteria_sympla).toLocaleString('pt-BR') + '. Recarregue o painel.';
+        b2.innerHTML = '<b>Pronto.</b> Vendidos (aprovados): ' + x.vendidos + ' · Bilheteria Sympla: R$ ' + Number(x.bilheteria_sympla).toLocaleString('pt-BR') + '<br><span style="color:var(--text-muted)">A Sympla devolveu ' + x.participantes_na_api + ' ingressos no total, dos quais ' + x.nao_aprovados + ' não aprovados' + (x.nao_aprovados ? ' (' + Object.keys(x.status_nao_aprovados || {}).map(function (k) { return k + ': ' + x.status_nao_aprovados[k]; }).join(', ') + ')' : '') + ' e ' + x.cortesias + ' cortesias. Pedidos: ' + x.pedidos_na_api + ' · valor lido de: ' + esc(x.valor_origem || '') + (x.aviso ? '<br>' + esc(x.aviso) : '') + '. Recarregue o painel.</span>';
       }).catch(function (e) { b2.innerHTML = '<span style="color:#B3261E">' + esc(e.message || 'Falhou.') + '</span>'; });
     };
   } catch (e) { box.innerHTML = '<span style="color:#B3261E">' + esc(e.message || 'Falhou.') + '</span>'; }

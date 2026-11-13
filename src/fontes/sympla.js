@@ -133,7 +133,7 @@ export async function coletarSympla(env, db, dia) {
   return {
     evento_id: eventId, eventos: ids.length, data: dia,
     valor_vendas_liquido: Math.round(valorLiquido * 100) / 100, valor_origem: valorOrigem, aviso,
-    quantidade_venda_sympla: part.length,
+    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, status_nao_aprovados: naoAprovados,
     checkin_realizados: checkinRealizados, checkin_restantes: checkinRestantes,
     cortesia_validada: cortesiaValidada, cortesia_validada_feminino: cortesiaValidadaF, cortesia_validada_masculino: cortesiaValidadaM,
     falta_entrar_feminino: faltaF, falta_entrar_masculino: faltaM,
