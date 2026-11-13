@@ -148,11 +148,30 @@ export async function coletarSympla(env, db, dia) {
     const q = (o) => Array.isArray(o.tickets) ? o.tickets.length : (Number(o.ticket_quantity) || Number(o.order_total_quantity) || Number(o.quantity) || Number(o.total_tickets) || null);
     if (pedidos.every((o) => q(o) !== null)) ingressosNosPedidos = pedidos.filter((o) => o.order_status === 'APPROVED').reduce((a, o) => a + q(o), 0);
   }
+  // diagnóstico dos pedidos que NÃO aparecem na lista de participantes (só contagens e datas, nada de pessoas)
+  let faltantes = null;
+  if (Array.isArray(pedidos) && pedidos.length) {
+    const comPart = new Set(todosPart.map((p) => String(p.order_id !== undefined ? p.order_id : '')));
+    const aprov = pedidos.filter((o) => o.order_status === 'APPROVED');
+    const falta = aprov.filter((o) => !comPart.has(String(o.id)));
+    const porTipo = {}; let minD = '', maxD = '', valorFalta = 0;
+    for (const o of falta) {
+      const t = String(o.transaction_type || '(vazio)'); porTipo[t] = (porTipo[t] || 0) + 1;
+      const d = String(o.approved_date || o.order_date || ''); if (d && (!minD || d < minD)) minD = d; if (d && d > maxD) maxD = d;
+      valorFalta += Number(o.order_total_net_value) || 0;
+    }
+    let amostra = null;
+    if (falta.length) {
+      try { const x = await buscarJson(BASE + '/events/' + ids[0] + '/orders/' + falta[0].id + '/participants', { headers: { s_token: token } }, 15000); amostra = { ok: true, participantes: (x.data || []).length }; }
+      catch (e) { amostra = { ok: false, erro: String((e && e.message) || e).slice(0, 120) }; }
+    }
+    faltantes = { pedidos_aprovados: aprov.length, pedidos_sem_participante: falta.length, valor_sem_participante: Math.round(valorFalta * 100) / 100, por_tipo: porTipo, de: minD, ate: maxD, teste_endpoint_por_pedido: amostra, participantes_com_order_id: todosPart.filter((p) => p.order_id !== undefined).length };
+  }
   const totalGenero = qtdF + qtdM;
   return {
     evento_id: eventId, eventos: ids.length, data: dia,
     valor_vendas_liquido: Math.round(valorLiquido * 100) / 100, valor_origem: valorOrigem, aviso,
-    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, pedidos_campos: pedidosCampos, ingressos_nos_pedidos: ingressosNosPedidos, status_nao_aprovados: naoAprovados,
+    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, pedidos_campos: pedidosCampos, faltantes, ingressos_nos_pedidos: ingressosNosPedidos, status_nao_aprovados: naoAprovados,
     checkin_realizados: checkinRealizados, checkin_restantes: checkinRestantes,
     cortesia_validada: cortesiaValidada, cortesia_validada_feminino: cortesiaValidadaF, cortesia_validada_masculino: cortesiaValidadaM,
     falta_entrar_feminino: faltaF, falta_entrar_masculino: faltaM,
