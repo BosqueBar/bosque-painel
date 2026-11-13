@@ -47,13 +47,25 @@ async function achaEventoId(db, token, dia) {
   return null;
 }
 
+// Lê TODAS as páginas até vir uma vazia (não confia no total de páginas que a Sympla informa: ele pode vir menor que o real).
+// Pede 200 por página e tira repetidos pelo id.
 async function todasPaginas(url, token) {
-  let todos = [], pagina = 1, temMais = true;
-  while (temMais && pagina <= 100) {
-    const j = await buscarJson(url + '?page=' + pagina, { headers: { s_token: token } }, 25000);
+  const todos = [], vistos = new Set();
+  let pagina = 1, ultimaMarca = '';
+  while (pagina <= 200) {
+    const j = await buscarJson(url + '?page=' + pagina + '&page_size=200', { headers: { s_token: token } }, 25000);
     const d = j.data || [];
-    todos = todos.concat(d);
-    temMais = d.length > 0 && j.pagination && pagina < j.pagination.total_page;
+    if (d.length === 0) break;
+    const marca = JSON.stringify(d[0]) + '|' + d.length;
+    if (marca === ultimaMarca) break; // a página veio igual à anterior: a Sympla está repetindo, acabou
+    ultimaMarca = marca;
+    let novos = 0;
+    for (const x of d) {
+      const k = x && x.id !== undefined && x.id !== null ? String(x.id) : null;
+      if (k !== null) { if (vistos.has(k)) continue; vistos.add(k); }
+      todos.push(x); novos++;
+    }
+    if (novos === 0) break;
     pagina++;
   }
   return todos;
