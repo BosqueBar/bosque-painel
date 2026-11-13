@@ -141,11 +141,18 @@ export async function coletarSympla(env, db, dia) {
     if (Math.abs(valorLiquido - valorParticipantes) > 0.5) aviso = 'participantes deixaram de fora R$ ' + (valorLiquido - valorParticipantes).toFixed(2) + '; usado o valor dos pedidos';
   } else if (pedidos && pedidos.erro) aviso = 'pedidos indisponíveis (' + pedidos.erro + '); valor pela soma dos participantes';
 
+  // diagnóstico: o que os pedidos trazem (só NOMES dos campos e contagens, nunca dados de pessoas)
+  let pedidosCampos = null, ingressosNosPedidos = null;
+  if (Array.isArray(pedidos) && pedidos.length) {
+    pedidosCampos = Object.keys(pedidos[0]).slice(0, 40);
+    const q = (o) => Array.isArray(o.tickets) ? o.tickets.length : (Number(o.ticket_quantity) || Number(o.order_total_quantity) || Number(o.quantity) || Number(o.total_tickets) || null);
+    if (pedidos.every((o) => q(o) !== null)) ingressosNosPedidos = pedidos.filter((o) => o.order_status === 'APPROVED').reduce((a, o) => a + q(o), 0);
+  }
   const totalGenero = qtdF + qtdM;
   return {
     evento_id: eventId, eventos: ids.length, data: dia,
     valor_vendas_liquido: Math.round(valorLiquido * 100) / 100, valor_origem: valorOrigem, aviso,
-    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, status_nao_aprovados: naoAprovados,
+    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, pedidos_campos: pedidosCampos, ingressos_nos_pedidos: ingressosNosPedidos, status_nao_aprovados: naoAprovados,
     checkin_realizados: checkinRealizados, checkin_restantes: checkinRestantes,
     cortesia_validada: cortesiaValidada, cortesia_validada_feminino: cortesiaValidadaF, cortesia_validada_masculino: cortesiaValidadaM,
     falta_entrar_feminino: faltaF, falta_entrar_masculino: faltaM,
