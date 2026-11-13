@@ -88,6 +88,7 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
     origem_cortesia_porta: (z.cortesia_validada_feminino || 0) + (z.cortesia_validada_masculino || 0),
     origem_cortesia_lista: u.validadas || 0,
     porta_lotes: z.porta_lotes || [],
+    antecipado_lotes: s.antecipado_lotes || [],
     lista_convidados: u.lista_convidados || 0,
     lista_entraram: u.lista_entraram || 0,
     checkin_sympla_api: ckApi,

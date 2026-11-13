@@ -63,6 +63,7 @@ export async function coletarSympla(env, db, dia) {
   let qtdF = 0, qtdM = 0, qtdFPago = 0, qtdMPago = 0, faltaF = 0, faltaM = 0;
   let valorParticipantes = 0;
   const hashPagos = [], hashCortesia = [];
+  const lotesAnt = {}; // por nome do ingresso: vendidos, entraram (check-in pela API) e valor
 
   for (const p of part) {
     const fezCheckin = !!(p.checkin && p.checkin.check_in);
@@ -87,6 +88,11 @@ export async function coletarSympla(env, db, dia) {
       if (eCortesia) { if (fezCheckin) cortesiaValidadaM++; } else { qtdMPago++; if (!fezCheckin) faltaM++; }
     }
     if (eCortesia) cortesias++;
+    else { // ingresso pago: soma por nome do lote/ingresso
+      const nl = String(p.ticket_name || 'Sem nome').trim() || 'Sem nome';
+      const l = lotesAnt[nl] || (lotesAnt[nl] = { lote: nl, vendidos: 0, entraram: 0, valor: 0 });
+      l.vendidos++; if (fezCheckin) l.entraram++; l.valor += (Number(p.ticket_sale_price) || 0) - (Number(p.order_discount) || 0);
+    }
     valorParticipantes += (Number(p.ticket_sale_price) || 0) - (Number(p.order_discount) || 0);
   }
 
@@ -109,6 +115,7 @@ export async function coletarSympla(env, db, dia) {
     pct_feminino: totalGenero ? Math.round((qtdF / totalGenero) * 100) : null,
     pct_masculino: totalGenero ? Math.round((qtdM / totalGenero) * 100) : null,
     qtd_feminino: qtdF, qtd_masculino: qtdM, qtd_feminino_pago: qtdFPago, qtd_masculino_pago: qtdMPago,
+    antecipado_lotes: Object.values(lotesAnt).map((l) => ({ lote: l.lote, vendidos: l.vendidos, entraram: l.entraram, valor: Math.round(l.valor * 100) / 100 })).sort((a, b) => b.vendidos - a.vendidos).slice(0, 12),
     cortesias, pedidos_nao_aprovados: Object.values(naoAprovados).reduce((a, b) => a + b, 0),
     hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia
   };

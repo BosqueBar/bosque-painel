@@ -245,6 +245,12 @@ function htmlOrigem(d, perm) {
   if (cortLista) partes.push('lista ' + fmt(cortLista));
   if (partes.length) h += '<p class="b-nota">Cortesia: ' + partes.join(' · ') + '</p>';
   h += '<p class="b-nota">Lista paga = nome na lista (UGO) que entrou sem ser cortesia; o pagamento foi na porta, por isso sai da bilheteria.</p>';
+  const ant = perm.bilheteria && Array.isArray(d.antecipado_lotes) ? d.antecipado_lotes : [];
+  if (ant.length) {
+    h += '<p class="b-st" style="margin-top:14px">Antecipado (Sympla) por lote</p><table class="b-table"><tr><th></th><th>Vend.</th><th>Entr.</th><th>Valor</th></tr>' +
+      ant.map(function (l) { return '<tr><td>' + esc(l.lote) + '</td><td class="n">' + fmt(l.vendidos) + '</td><td class="n">' + fmt(l.entraram) + '</td><td class="n">' + fmtMoeda(l.valor) + '</td></tr>'; }).join('') + '</table>' +
+      '<p class="b-nota">Valor = preço do ingresso menos desconto. Entraram = check-in lido pela Sympla (pode atrasar em relação ao total do topo).</p>';
+  }
   const lotes = perm.bilheteria && Array.isArray(d.porta_lotes) ? d.porta_lotes : [];
   if (lotes.length) {
     h += '<p class="b-st" style="margin-top:14px">Porta por lote</p><table class="b-table"><tr><th></th><th>Qtd</th><th>Valor</th></tr>' +

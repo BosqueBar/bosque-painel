@@ -110,7 +110,7 @@ const CAMPOS_CONTAGEM = ['pessoas_na_casa', 'falta_entrar_antecipado', 'falta_en
   'lista_convidados', 'lista_entraram', 'entradas_por_hora',
   'origem_sympla_pago', 'origem_porta_pago', 'origem_lista_paga', 'origem_cortesia_sympla', 'origem_cortesia_porta', 'origem_cortesia_lista'];
 const CAMPOS_BILHETERIA = ['bilheteria_total', 'bilheteria_sympla', 'bilheteria_porta', 'quantidade_venda_sympla', 'quantidade_checkin_sympla',
-  'quantidade_venda_porta', 'quantidade_checkin_porta', 'cortesia_validada_total', 'ticket_medio_bilheteria', 'porta_lotes'];
+  'quantidade_venda_porta', 'quantidade_checkin_porta', 'cortesia_validada_total', 'ticket_medio_bilheteria', 'porta_lotes', 'antecipado_lotes'];
 const CAMPOS_BAR = ['faturamento_bar', 'faturamento_bar_recebido', 'consumo_por_hora', 'ticket_medio_bar'];
 
 export function filtrarPainel(d, perm) {
