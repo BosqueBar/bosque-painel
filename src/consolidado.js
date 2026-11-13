@@ -43,10 +43,8 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
   // sem ela (ou se vier fora do razoável), usa a estimativa por média de ingressos por pedido.
   const listaSy = s.quantidade_venda_sympla || 0, estSy = s.ingressos_estimados_sem_lista || 0, ugoSy = u.sympla_ingressos_total || 0;
   let extraSympla = 0, fonteSympla = '';
-  if (estSy > 0 || ugoSy > listaSy) {
-    if (ugoSy >= listaSy && ugoSy - listaSy <= Math.max(estSy * 1.5, 30)) { extraSympla = ugoSy - listaSy; fonteSympla = 'ugo'; }
-    else { extraSympla = estSy; fonteSympla = 'estimativa'; }
-  }
+  if (ugoSy > listaSy) { extraSympla = ugoSy - listaSy; fonteSympla = 'ugo'; }
+  else if (estSy > 0) { extraSympla = estSy; fonteSympla = 'estimativa'; }
   let faltaAnt = (s.checkin_restantes || 0) + extraSympla, faltaAntF = s.falta_entrar_feminino || 0, faltaAntM = s.falta_entrar_masculino || 0;
   if (ugoAcima) {
     symValF = u.sympla_entradas_f || 0;
