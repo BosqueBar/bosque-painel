@@ -70,6 +70,7 @@ export async function contarSymplaPorHash(ingressos, hashPagos, hashCortesia, di
     sympla_ingressos_total: 0, sympla_cortesia_entradas: 0, sympla_cortesia_f: 0, sympla_cortesia_m: 0, sympla_cortesia_sem_genero: 0, horas_sympla: {} };
   const pagos = new Set(hashPagos || []), cort = new Set(hashCortesia || []);
   for (const t of ingressos || []) {
+    if (t.blocked === true) continue; // ingresso bloqueado/descartado (ex.: transferido, o novo é gerado para outra pessoa): não conta
     const e = String(t.accountEmail || '').trim().toLowerCase();
     if (!e) continue;
     const h = await sha256(e);
