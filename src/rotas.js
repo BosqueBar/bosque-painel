@@ -13,7 +13,7 @@ const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const BLOQUEIO_FIM = '2099-12-31T00:00:00Z';
 
-function chaveTeste(url, env) { // chave de emergência / testes (ver Etapa 6: removida na virada)
+function chaveTeste(url, env) { // chave de EMERGÊNCIA: só serve para recriar o acesso da administradora (/api/admin/iniciar). Guardar em segredo.
   const c = url.searchParams.get('chave') || '', k = String(env.TESTE_CHAVE || '');
   if (!k || c.length !== k.length) return false;
   let d = 0; for (let i = 0; i < k.length; i++) d |= c.charCodeAt(i) ^ k.charCodeAt(i);
@@ -332,7 +332,7 @@ export async function api(request, url, env, db) {
     if (rota === '/api/entrar' && request.method === 'POST') return await entrar(request, env, db);
     if (rota === '/api/sair') return json({ ok: true }, 200, { 'Set-Cookie': cookieSair() });
 
-    const legado = chaveTeste(url, env); // link de teste da Fase 3 continua valendo até a virada
+    const legado = false; // o link de teste da Fase 3 foi desligado na virada
     const p = legado ? null : await pessoaDaSessao(request, env, db);
     if (!legado && !p) return json({ erro: 'Sessão expirada. Abra de novo o link que você recebeu e digite o PIN.', sem_sessao: true }, 401);
 
