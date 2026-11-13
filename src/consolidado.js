@@ -80,9 +80,10 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
     quantidade_cortesia_validada_lista: u.validadas || 0,
     entradas_por_hora: entradasPorHora,
     consumo_por_hora: consumoPorHora,
+    // "Por onde entrou" fecha com "Na casa": a lista que pagou paga na porta (já está nos ingressos da porta), então sai da bilheteria da porta
     origem_sympla_pago: Math.max(0, ckUsado),
-    origem_porta_pago: z.ingressos_validados || 0,
-    origem_lista_paga: u.lista_pagantes_entraram || 0,
+    origem_porta_pago: Math.max(0, (z.ingressos_validados || 0) - Math.min(z.ingressos_validados || 0, u.lista_pagantes_entraram || 0)),
+    origem_lista_paga: Math.min(z.ingressos_validados || 0, u.lista_pagantes_entraram || 0),
     origem_cortesia_sympla: symCortTotal,
     origem_cortesia_porta: (z.cortesia_validada_feminino || 0) + (z.cortesia_validada_masculino || 0),
     origem_cortesia_lista: u.validadas || 0,
