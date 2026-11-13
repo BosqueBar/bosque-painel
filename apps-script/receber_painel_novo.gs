@@ -1,5 +1,5 @@
 /**
- * exportar_painel.gs — recebe do painel novo (Cloudflare) as noites e grava na aba Painel_Consolidado.
+ * receber_painel_novo.gs — recebe do painel novo (Cloudflare) as noites e grava na aba Painel_Consolidado.
  * Arquivo NOVO: não mexe em nenhum outro arquivo do projeto.
  *
  * Antes de usar: Configurações do projeto > Propriedades do script > adicionar
@@ -102,6 +102,6 @@ function gravarNoitesPainel_(noites) {
 }
 
 /** Teste manual (opcional): rode no editor para ver se o arquivo está sem erro de sintaxe. Não grava nada. */
-function testeExportarPainel() {
+function testeReceberPainelNovo() {
   Logger.log('Arquivo ok. Propriedade EXPORTAR_CHAVE definida? ' + (PropertiesService.getScriptProperties().getProperty('EXPORTAR_CHAVE') ? 'sim' : 'NÃO'));
 }
