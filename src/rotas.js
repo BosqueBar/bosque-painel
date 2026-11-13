@@ -5,6 +5,8 @@ import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
 import { noitesAnteriores, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
+import { eventosDaData, idsGuardados } from './fontes/sympla.js';
+import { coletarNoite } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -286,6 +288,21 @@ async function admin(request, url, env, db, p) {
       token_zig: { guardado: !!tk.zig_token, atualizado_em: tk.zig_token ? tk.zig_token.atualizado_em : null, variavel_antiga: !!env.ZIG_TOKEN },
       tokens_porta: DIAS_TOKEN.map((d) => ({ dia: d, guardado: !!tk['st_token_' + d], atualizado_em: tk['st_token_' + d] ? tk['st_token_' + d].atualizado_em : null, variavel_antiga: !!env['SUPERTICKET_TOKEN_' + d] }))
     });
+  }
+  if (rota === 'sympla-eventos' && request.method === 'GET') { // eventos da Sympla numa data + os que estão sendo somados
+    const dia = String(url.searchParams.get('dia') || '');
+    if (!DATA.test(dia)) throw new Error('Data inválida.');
+    if (!env.SYMPLA_TOKEN) throw new Error('Falta o token da Sympla na Cloudflare.');
+    return json({ dia, escolhidos: await idsGuardados(db, dia), eventos: await eventosDaData(env.SYMPLA_TOKEN, dia) });
+  }
+  if (rota === 'sympla-eventos' && request.method === 'POST') { // escolhe quais eventos somar e relê a Sympla da noite agora
+    const dia = String(b.dia || '');
+    const ids = (Array.isArray(b.ids) ? b.ids : []).map((x) => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
+    if (!DATA.test(dia) || !ids.length) throw new Error('Escolha a data e pelo menos um evento.');
+    await db.ins('pt_config', [{ chave: 'sympla_evento_' + dia, valor: ids.join(','), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
+    const rr = await coletarNoite(env, db, dia, { forcar: true, fontes: ['sympla', 'ugo'] });
+    const sy = (rr.painel && rr.painel.quantidade_venda_sympla) || 0;
+    return json({ ok: true, dia, ids, vendidos: sy, bilheteria_sympla: (rr.painel && rr.painel.bilheteria_sympla) || 0, resultado: rr.resultados && rr.resultados.sympla });
   }
   if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes
     const hoje = agoraBR().dia, cal = await calendarioDb(db);

@@ -517,8 +517,34 @@ async function abaSaude() {
     return '<tr><td>' + NOME[k] + '</td><td>' + estado + '</td><td>' + (m === null ? 'nunca' : 'há ' + m + ' min') + (f.erro ? '<br><span style="color:#B3261E">' + esc(f.erro) + '</span>' : '') + '</td></tr>';
   }).join('');
   el().innerHTML = '<div class="card"><p class="b-st">Fontes da noite ' + dataBR(j.noite) + (j.ao_vivo ? ' (ao vivo)' : ' (fora do horário de evento)') + '</p><table class="t"><tr><th>Fonte</th><th>Estado</th><th>Última leitura</th></tr>' + linhas + '</table>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Ao vivo, a fonte fica "atrasada" se passar de 3 minutos sem ler. Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoPlanilha(j.exportacao);
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Ao vivo, a fonte fica "atrasada" se passar de 3 minutos sem ler. Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoSympla(j.noite) + cartaoPlanilha(j.exportacao);
   document.getElementById('bt-exportar').onclick = enviarPlanilha;
+  document.getElementById('bt-sy-ver').onclick = verEventosSympla;
+}
+function cartaoSympla(noite) {
+  return '<div class="card" style="margin-top:12px"><p class="b-st">Sympla: eventos da noite</p>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px">Se a venda antecipada do painel estiver menor que a da Sympla, a noite pode ter mais de um evento na Sympla. Veja a lista e marque todos os que devem ser somados.</p>' +
+    '<input type="date" id="sy-dia" value="' + esc(noite || '') + '" style="margin-bottom:10px"> <button class="bt sec" id="bt-sy-ver">Ver eventos desta data</button><div id="res-sy" style="margin-top:10px;font-size:13px"></div></div>';
+}
+async function verEventosSympla() {
+  const box = document.getElementById('res-sy'), dia = document.getElementById('sy-dia').value;
+  if (!dia) { box.textContent = 'Escolha a data.'; return; }
+  box.textContent = 'Buscando na Sympla…';
+  try {
+    const r = await chamar('GET', '/api/admin/sympla-eventos?dia=' + encodeURIComponent(dia));
+    if (!r.eventos.length) { box.textContent = 'A Sympla não tem nenhum evento começando nessa data.'; return; }
+    box.innerHTML = r.eventos.map(function (e) {
+      return '<label style="display:block;margin:6px 0"><input type="checkbox" class="sy-ck" value="' + esc(e.id) + '"' + (r.escolhidos.indexOf(e.id) >= 0 ? ' checked' : '') + '> ' + esc(e.nome) + ' <span style="color:var(--text-muted)">(' + esc(e.inicio.substring(11, 16)) + ' · código ' + esc(e.id) + ')</span></label>';
+    }).join('') + '<p style="color:var(--text-muted);font-size:12px;margin:6px 0">' + (r.escolhidos.length ? 'Marcados = os que o painel está somando agora.' : 'Nenhum escolhido ainda: o painel usa o primeiro que encontrar.') + '</p><button class="bt" id="bt-sy-usar">Somar os marcados e reler agora</button><div id="res-sy2" style="margin-top:8px"></div>';
+    document.getElementById('bt-sy-usar').onclick = function () {
+      const ids = Array.prototype.map.call(document.querySelectorAll('.sy-ck:checked'), function (c) { return c.value; });
+      const b2 = document.getElementById('res-sy2'); if (!ids.length) { b2.textContent = 'Marque pelo menos um evento.'; return; }
+      b2.textContent = 'Lendo a Sympla…';
+      chamar('POST', '/api/admin/sympla-eventos', { dia: dia, ids: ids }).then(function (x) {
+        b2.innerHTML = '<b>Pronto.</b> Vendidos: ' + x.vendidos + ' · Bilheteria Sympla: R$ ' + Number(x.bilheteria_sympla).toLocaleString('pt-BR') + '. Recarregue o painel.';
+      }).catch(function (e) { b2.innerHTML = '<span style="color:#B3261E">' + esc(e.message || 'Falhou.') + '</span>'; });
+    };
+  } catch (e) { box.innerHTML = '<span style="color:#B3261E">' + esc(e.message || 'Falhou.') + '</span>'; }
 }
 function cartaoPlanilha(x) {
   const u = x && x.ultimo;

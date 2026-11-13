@@ -10,6 +10,24 @@ import { buscarJson, sha256 } from '../util.js';
 const BASE = 'https://api.sympla.com.br/public/v1.5.1';
 const CAMPO_GENERO = 'Gênero';
 
+// Lista os eventos da Sympla que começam em `dia` (para a Annie escolher quais somar).
+export async function eventosDaData(token, dia) {
+  const r = []; let pagina = 1;
+  while (pagina <= 50) {
+    const j = await buscarJson(BASE + '/events?page=' + pagina, { headers: { s_token: token } }, 20000);
+    const dados = j.data || [];
+    for (const e of dados) if (String(e.start_date || '').substring(0, 10) === dia) r.push({ id: String(e.id), nome: String(e.name || ''), inicio: String(e.start_date || '') });
+    if (!(j.pagination && j.pagination.has_next) || !dados.length) break;
+    pagina++;
+  }
+  return r;
+}
+// Ids guardados para a noite (um ou vários, separados por vírgula).
+export async function idsGuardados(db, dia) {
+  const g = await db.sel('pt_config', { select: 'valor', chave: 'eq.sympla_evento_' + dia });
+  return g && g[0] && g[0].valor ? String(g[0].valor).split(',').map((x) => x.trim()).filter(Boolean) : [];
+}
+
 async function achaEventoId(db, token, dia) {
   const chave = 'sympla_evento_' + dia;
   const guardado = await db.sel('pt_config', { select: 'valor', chave: 'eq.' + chave });
@@ -45,14 +63,21 @@ async function todasPaginas(url, token) {
 export async function coletarSympla(env, db, dia) {
   const token = env.SYMPLA_TOKEN;
   if (!token) throw new Error('falta a variável SYMPLA_TOKEN');
-  const eventId = await achaEventoId(db, token, dia);
-  if (!eventId) return { semEvento: true, dia };
+  const achado = await achaEventoId(db, token, dia);
+  if (!achado) return { semEvento: true, dia };
+  const ids = String(achado).split(',').map((x) => x.trim()).filter(Boolean); // uma noite pode ter mais de um evento na Sympla: soma todos
+  const eventId = ids.join(',');
 
-  // participantes e pedidos ao mesmo tempo
-  const [todosPart, pedidos] = await Promise.all([
-    todasPaginas(BASE + '/events/' + eventId + '/participants', token),
-    todasPaginas(BASE + '/events/' + eventId + '/orders', token).catch((e) => { return { erro: e.message }; })
-  ]);
+  // participantes e pedidos (de todos os eventos da noite) ao mesmo tempo
+  let todosPart = [], pedidos = [];
+  for (const id of ids) {
+    const [pp, oo] = await Promise.all([
+      todasPaginas(BASE + '/events/' + id + '/participants', token),
+      todasPaginas(BASE + '/events/' + id + '/orders', token).catch((e) => { return { erro: e.message }; })
+    ]);
+    todosPart = todosPart.concat(pp);
+    if (Array.isArray(pedidos) && Array.isArray(oo)) pedidos = pedidos.concat(oo); else pedidos = Array.isArray(oo) ? pedidos : oo;
+  }
 
   const naoAprovados = {};
   todosPart.forEach((p) => { if (p.order_status !== 'APPROVED') { const s = p.order_status || '(vazio)'; naoAprovados[s] = (naoAprovados[s] || 0) + 1; } });
@@ -106,7 +131,7 @@ export async function coletarSympla(env, db, dia) {
 
   const totalGenero = qtdF + qtdM;
   return {
-    evento_id: eventId, data: dia,
+    evento_id: eventId, eventos: ids.length, data: dia,
     valor_vendas_liquido: Math.round(valorLiquido * 100) / 100, valor_origem: valorOrigem, aviso,
     quantidade_venda_sympla: part.length,
     checkin_realizados: checkinRealizados, checkin_restantes: checkinRestantes,
