@@ -172,12 +172,25 @@ export async function coletarSympla(env, db, dia) {
     const pedidosComLista = aprov.length - falta.length;
     const pagosLista = part.filter((p) => !(Number(p.ticket_sale_price) === 0 || (p.ticket_name && String(p.ticket_name).toLowerCase().includes('cortesia')))).length;
     estimadosSemLista = pedidosComLista > 0 ? Math.round(falta.length * (pagosLista / pedidosComLista)) : 0;
-    let amostra = null;
+    // testes de rota alternativa para os pedidos sem participante (só contagens; nunca e-mails nem nomes)
+    const amostra = {};
+    const tenta = async (nome, caminho) => {
+      try { const x = await buscarJson(BASE + caminho, { headers: { s_token: token } }, 15000); amostra[nome] = (x.data || []).length; }
+      catch (e) { amostra[nome] = 'erro: ' + String((e && e.message) || e).slice(0, 60); }
+    };
     if (falta.length) {
-      try { const x = await buscarJson(BASE + '/events/' + ids[0] + '/orders/' + falta[0].id + '/participants', { headers: { s_token: token } }, 15000); amostra = { ok: true, participantes: (x.data || []).length }; }
-      catch (e) { amostra = { ok: false, erro: String((e && e.message) || e).slice(0, 120) }; }
+      const o1 = falta[0], o2 = falta[falta.length - 1];
+      await tenta('pedido_primeiro', '/events/' + ids[0] + '/orders/' + o1.id + '/participants');
+      await tenta('pedido_primeiro_incluindo_cancelados', '/events/' + ids[0] + '/orders/' + o1.id + '/participants?cancelled_filter=include');
+      await tenta('pedido_ultimo', '/events/' + ids[0] + '/orders/' + o2.id + '/participants');
+      await tenta('busca_por_email_primeiro', '/events/' + ids[0] + '/participants?participant_email=' + encodeURIComponent(String(o1.buyer_email || '')));
+      await tenta('busca_por_email_ultimo', '/events/' + ids[0] + '/participants?participant_email=' + encodeURIComponent(String(o2.buyer_email || '')));
+      await tenta('lista_incluindo_cancelados', '/events/' + ids[0] + '/participants?cancelled_filter=include&page_size=500');
     }
-    faltantes = { pedidos_aprovados: aprov.length, pedidos_sem_participante: falta.length, valor_sem_participante: Math.round(valorFalta * 100) / 100, por_tipo: porTipo, de: minD, ate: maxD, teste_endpoint_por_pedido: amostra, participantes_com_order_id: todosPart.filter((p) => p.order_id !== undefined).length };
+    const porDia = {}; for (const o of falta) { const d = String(o.approved_date || o.order_date || '').substring(0, 10); if (d) porDia[d] = (porDia[d] || 0) + 1; }
+    const comPartPorDia = {}; for (const o of aprov) { if (comPart.has(String(o.id))) { const d = String(o.approved_date || o.order_date || '').substring(0, 10); if (d) comPartPorDia[d] = (comPartPorDia[d] || 0) + 1; } }
+    const ultimoComLista = Object.keys(comPartPorDia).sort().pop() || '';
+    faltantes = { pedidos_aprovados: aprov.length, pedidos_sem_participante: falta.length, valor_sem_participante: Math.round(valorFalta * 100) / 100, por_tipo: porTipo, de: minD, ate: maxD, testes_rotas: amostra, sem_lista_por_dia: porDia, ultimo_dia_com_lista: ultimoComLista, participantes_com_order_id: todosPart.filter((p) => p.order_id !== undefined).length };
   }
   const totalGenero = qtdF + qtdM;
   return {
