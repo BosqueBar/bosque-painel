@@ -49,11 +49,13 @@ async function achaEventoId(db, token, dia) {
 
 // Lê TODAS as páginas até vir uma vazia (não confia no total de páginas que a Sympla informa: ele pode vir menor que o real).
 // Pede 200 por página e tira repetidos pelo id.
-async function todasPaginas(url, token) {
+async function todasPaginas(url, token, info) {
   const todos = [], vistos = new Set();
-  let pagina = 1, ultimaMarca = '';
+  let pagina = 1, ultimaMarca = '', cursor = '';
   while (pagina <= 200) {
-    const j = await buscarJson(url + '?page=' + pagina + '&page_size=200', { headers: { s_token: token } }, 25000);
+    const q = cursor ? '?cursor=' + encodeURIComponent(cursor) + '&page_size=200' : '?page=' + pagina + '&page_size=200';
+    const j = await buscarJson(url + q, { headers: { s_token: token } }, 25000);
+    if (info && pagina === 1) info.paginacao = Object.keys(j.pagination || {}); // só os NOMES dos campos de paginação (diagnóstico)
     const d = j.data || [];
     if (d.length === 0) break;
     const marca = JSON.stringify(d[0]) + '|' + d.length;
@@ -66,6 +68,8 @@ async function todasPaginas(url, token) {
       todos.push(x); novos++;
     }
     if (novos === 0) break;
+    const prox = j.pagination && (j.pagination.next_cursor || j.pagination.nextCursor);
+    if (prox) { cursor = String(prox); if (info) info.usouCursor = true; } else if (cursor) break; // acabou o cursor
     pagina++;
   }
   return todos;
@@ -82,9 +86,10 @@ export async function coletarSympla(env, db, dia) {
 
   // participantes e pedidos (de todos os eventos da noite) ao mesmo tempo
   let todosPart = [], pedidos = [];
+  const infoPag = {};
   for (const id of ids) {
     const [pp, oo] = await Promise.all([
-      todasPaginas(BASE + '/events/' + id + '/participants', token),
+      todasPaginas(BASE + '/events/' + id + '/participants', token, infoPag),
       todasPaginas(BASE + '/events/' + id + '/orders', token).catch((e) => { return { erro: e.message }; })
     ]);
     todosPart = todosPart.concat(pp);
@@ -196,7 +201,7 @@ export async function coletarSympla(env, db, dia) {
   return {
     evento_id: eventId, eventos: ids.length, data: dia,
     valor_vendas_liquido: Math.round(valorLiquido * 100) / 100, valor_origem: valorOrigem, aviso,
-    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, pedidos_campos: pedidosCampos, faltantes, ingressos_nos_pedidos: ingressosNosPedidos, status_nao_aprovados: naoAprovados,
+    quantidade_venda_sympla: part.length, participantes_brutos: todosPart.length, pedidos_na_api: Array.isArray(pedidos) ? pedidos.length : null, pedidos_campos: pedidosCampos, paginacao_participantes: infoPag, faltantes, ingressos_nos_pedidos: ingressosNosPedidos, status_nao_aprovados: naoAprovados,
     checkin_realizados: checkinRealizados, checkin_restantes: checkinRestantes,
     cortesia_validada: cortesiaValidada, cortesia_validada_feminino: cortesiaValidadaF, cortesia_validada_masculino: cortesiaValidadaM,
     falta_entrar_feminino: faltaF, falta_entrar_masculino: faltaM,
