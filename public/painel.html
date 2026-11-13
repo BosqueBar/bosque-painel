@@ -164,7 +164,7 @@ function renderizarProximo(d, perm) {
     '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
   conteudo.innerHTML = '<span class="badge-passado" style="color:var(--teal);border-color:var(--teal)">Próximo evento · só venda antecipada e lista</span>' +
     htmlFontes(d.fontes, false, true) +
-    ((topo || chips) ? '<div class="card">' + topo + chips + ((perm.bilheteria && Number(d.venda_sympla_estimada) > 0) ? '<p class="b-nota" style="margin:10px 0 0">≈ A Sympla não lista os ingressos de alguns pedidos; ' + fmt(d.venda_sympla_estimada) + ' ingressos foram estimados. O valor em R$ é exato.</p>' : '') + '</div>' : '') +
+    ((topo || chips) ? '<div class="card">' + topo + chips + '' + '</div>' : '') +
     (perm.contagem ? '<div class="card-outline"><p class="b-st">Antecipado por gênero</p><table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
       '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table></div>' : '');
 }
@@ -201,7 +201,7 @@ function renderizar(d, hoje, noite, aoVivo, proxima) {
       '<div class="b-chip">Porta<b>' + fmt(d.quantidade_checkin_porta) + ' <em>/ ' + fmt(d.quantidade_venda_porta) + '</em></b></div>' +
       '<div class="b-chip">Cortesia<b>' + fmt(d.cortesia_validada_total) + '</b></div></div>' : '';
 
-  const notaEst = (perm.bilheteria && Number(d.venda_sympla_estimada) > 0) ? '<p class="b-nota" style="margin:10px 0 0">≈ A Sympla não lista os ingressos de alguns pedidos; ' + fmt(d.venda_sympla_estimada) + ' ingressos foram estimados. O valor em R$ é exato.</p>' : '';
+  const notaEst = '';
   conteudo.innerHTML =
     (!aoVivo ? '<span class="badge-passado">Evento passado</span>' : '') +
     htmlFontes(d.fontes, aoVivo) +
