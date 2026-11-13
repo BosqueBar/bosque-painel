@@ -310,7 +310,7 @@ async function admin(request, url, env, db, p) {
     if (x.erro) throw new Error('A Sympla não respondeu: ' + x.erro);
     const fu = await db.sel('pt_fontes', { select: 'dados,erro', noite: 'eq.' + dia, fonte: 'eq.ugo' });
     const du = (fu && fu[0] && fu[0].dados) || {};
-    return json({ ok: true, dia, ids, ugo: { ingressos_na_api: du.ugo_ingressos_api, cruzados_com_email_sympla: du.sympla_ingressos_total, aviso: du.aviso_ingressos_sympla || '', erro: (fu && fu[0] && fu[0].erro) || '' }, vendidos: d.quantidade_venda_sympla || 0, bilheteria_sympla: d.valor_vendas_liquido || 0,
+    return json({ ok: true, dia, ids, ugo: { ingressos_na_api: du.ugo_ingressos_api, cruzados_com_email_sympla: du.sympla_ingressos_total, campos: du.ugo_campos_ingresso, valores: du.ugo_valores_ingresso, aviso: du.aviso_ingressos_sympla || '', erro: (fu && fu[0] && fu[0].erro) || '' }, vendidos: d.quantidade_venda_sympla || 0, bilheteria_sympla: d.valor_vendas_liquido || 0,
       participantes_na_api: d.participantes_brutos || 0, pedidos_na_api: d.pedidos_na_api, pedidos_campos: d.pedidos_campos, faltantes: d.faltantes, paginacao_participantes: d.paginacao_participantes, ingressos_nos_pedidos: d.ingressos_nos_pedidos, status_nao_aprovados: d.status_nao_aprovados || {}, nao_aprovados: d.pedidos_nao_aprovados || 0, cortesias: d.cortesias || 0, valor_origem: d.valor_origem, aviso: d.aviso || '' });
   }
   if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes

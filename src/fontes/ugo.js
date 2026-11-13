@@ -134,7 +134,25 @@ export async function coletarUgo(env, db, dia, hashes) {
     try {
       const ing = await get(env, '/api/v1/ticket/event/' + uid);
       Object.assign(r, await contarSymplaPorHash(ing.data || [], hashes.pagos, hashes.cortesia, dia));
-      r.ugo_ingressos_api = (ing.data || []).length; // diagnóstico: total de ingressos que a UGO devolve (sem cruzar e-mail)
+      r.ugo_ingressos_api = (ing.data || []).length;
+      try { // diagnóstico sem dados pessoais: campos do ingresso e contagem por valor (só campos com poucos valores diferentes)
+        const arr = ing.data || [], cont = {}, campos = new Set();
+        const pagos = new Set(hashes.pagos || []);
+        for (const t of arr) {
+          const e = String(t.accountEmail || '').trim().toLowerCase();
+          const casa = e && pagos.has(await sha256(e));
+          for (const k of Object.keys(t)) {
+            campos.add(k);
+            const v = t[k];
+            if (v === null || typeof v === 'object' || (typeof v === 'string' && v.length > 25) || /mail|name|phone|cpf|document|uid|id$/i.test(k)) continue;
+            const c = (cont[k] = cont[k] || {}); const kk = String(v);
+            if (Object.keys(c).length > 8 && !(kk in c)) { c._muitos = 1; continue; }
+            c[kk] = c[kk] || { todos: 0, casados: 0 }; c[kk].todos++; if (casa) c[kk].casados++;
+          }
+        }
+        for (const k of Object.keys(cont)) if (cont[k]._muitos) delete cont[k];
+        r.ugo_campos_ingresso = [...campos]; r.ugo_valores_ingresso = cont;
+      } catch (e) { r.ugo_valores_ingresso = { erro: e.message }; } // diagnóstico: total de ingressos que a UGO devolve (sem cruzar e-mail)
     } catch (e) { r.aviso_ingressos_sympla = 'UGO (ingressos Sympla) falhou: ' + e.message + ' — manter o último valor guardado'; }
   }
   return r;
