@@ -104,7 +104,8 @@ export async function coletarSympla(env, db, dia) {
   let cortesiaValidada = 0, cortesiaValidadaF = 0, cortesiaValidadaM = 0;
   let qtdF = 0, qtdM = 0, qtdFPago = 0, qtdMPago = 0, faltaF = 0, faltaM = 0;
   let valorParticipantes = 0;
-  const hashPagos = [], hashCortesia = [];
+  const hashPagos = [], hashCortesia = [], hashSemLista = [];
+  let mediaIngPedido = 0;
   const lotesAnt = {}; // por nome do ingresso: vendidos, entraram (check-in pela API) e valor
 
   for (const p of part) {
@@ -169,13 +170,15 @@ export async function coletarSympla(env, db, dia) {
     const ja = new Set(hashPagos);
     for (const o of falta) {
       const em = String(o.buyer_email || '').trim().toLowerCase();
-      if (!em) continue;
+      if (!em) { hashSemLista.push(''); continue; }
       const h = await sha256(em);
+      hashSemLista.push(h); // um por pedido (pode repetir): serve para ver quais pedidos a UGO ainda não recebeu
       if (!ja.has(h)) { ja.add(h); hashPagos.push(h); }
     }
     // estimativa dos ingressos desses pedidos: média de ingressos por pedido entre os pedidos que TÊM lista
     const pedidosComLista = aprov.length - falta.length;
     const pagosLista = part.filter((p) => !(Number(p.ticket_sale_price) === 0 || (p.ticket_name && String(p.ticket_name).toLowerCase().includes('cortesia')))).length;
+    mediaIngPedido = pedidosComLista > 0 ? pagosLista / pedidosComLista : 0;
     estimadosSemLista = pedidosComLista > 0 ? Math.round(falta.length * (pagosLista / pedidosComLista)) : 0;
     // testes de rota alternativa para os pedidos sem participante (só contagens; nunca e-mails nem nomes)
     const amostra = {};
@@ -210,6 +213,6 @@ export async function coletarSympla(env, db, dia) {
     qtd_feminino: qtdF, qtd_masculino: qtdM, qtd_feminino_pago: qtdFPago, qtd_masculino_pago: qtdMPago,
     antecipado_lotes: Object.values(lotesAnt).map((l) => ({ lote: l.lote, vendidos: l.vendidos, entraram: l.entraram, valor: Math.round(l.valor * 100) / 100 })).sort((a, b) => b.vendidos - a.vendidos).slice(0, 12),
     cortesias, pedidos_nao_aprovados: Object.values(naoAprovados).reduce((a, b) => a + b, 0),
-    ingressos_estimados_sem_lista: estimadosSemLista, hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia
+    ingressos_estimados_sem_lista: estimadosSemLista, hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia, hash_pedidos_sem_lista: hashSemLista, media_ingressos_pedido: mediaIngPedido
   };
 }

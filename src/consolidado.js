@@ -43,7 +43,10 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
   // sem ela (ou se vier fora do razoável), usa a estimativa por média de ingressos por pedido.
   const listaSy = s.quantidade_venda_sympla || 0, estSy = s.ingressos_estimados_sem_lista || 0, ugoSy = u.sympla_ingressos_total || 0;
   let extraSympla = 0, fonteSympla = '';
-  if (ugoSy > listaSy) { extraSympla = ugoSy - listaSy; fonteSympla = 'ugo'; }
+  // UGO + pedidos que a UGO ainda não recebeu (estimados pela média de ingressos por pedido)
+  const naoSync = Math.round((u.pedidos_sem_ugo || 0) * (s.media_ingressos_pedido || 0));
+  const totUgo = ugoSy + naoSync;
+  if (totUgo > listaSy) { extraSympla = totUgo - listaSy; fonteSympla = 'ugo'; }
   else if (estSy > 0) { extraSympla = estSy; fonteSympla = 'estimativa'; }
   let faltaAnt = (s.checkin_restantes || 0) + extraSympla, faltaAntF = s.falta_entrar_feminino || 0, faltaAntM = s.falta_entrar_masculino || 0;
   if (ugoAcima) {

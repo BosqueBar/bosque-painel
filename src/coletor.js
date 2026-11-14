@@ -98,7 +98,7 @@ export async function coletarNoite(env, db, dia, opcoes) {
   env = await envComTokens(env, db); // tokens colados na tela de admin valem mais que as variáveis antigas
   const antes = await lerFontes(db, dia);
   const hashes = antes.sympla && antes.sympla.dados && antes.sympla.dados.hash_emails_pagos
-    ? { pagos: antes.sympla.dados.hash_emails_pagos, cortesia: antes.sympla.dados.hash_emails_cortesia } : null;
+    ? { pagos: antes.sympla.dados.hash_emails_pagos, cortesia: antes.sympla.dados.hash_emails_cortesia, semLista: antes.sympla.dados.hash_pedidos_sem_lista || [] } : null;
   const agora = Date.now();
   const pular = (fonte, segundos) => !o.forcar && antes[fonte] && antes[fonte].tentativa_em && (agora - new Date(antes[fonte].tentativa_em).getTime()) < segundos * 1000;
 
@@ -110,7 +110,7 @@ export async function coletarNoite(env, db, dia, opcoes) {
     resultados.sympla = await atualizarFonte(env, db, dia, 'sympla', antes.sympla, null);
     const novo = await lerFontes(db, dia);
     const d = novo.sympla && novo.sympla.dados;
-    if (d && d.hash_emails_pagos) h = { pagos: d.hash_emails_pagos, cortesia: d.hash_emails_cortesia };
+    if (d && d.hash_emails_pagos) h = { pagos: d.hash_emails_pagos, cortesia: d.hash_emails_cortesia, semLista: d.hash_pedidos_sem_lista || [] };
   }
   return coletarRestante(env, db, dia, antes, quais.filter((n) => !resultados[n]), h, pular, resultados);
 }

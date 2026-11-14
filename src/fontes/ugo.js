@@ -65,17 +65,17 @@ export function contarCortesiaLista(convites, dia) {
 }
 
 // Ingressos da UGO COM check-in cujo e-mail (em hash) é de comprador da Sympla. Pago tem prioridade se o e-mail estiver nos dois.
-export async function contarSymplaPorHash(ingressos, hashPagos, hashCortesia, dia) {
+export async function contarSymplaPorHash(ingressos, hashPagos, hashCortesia, dia, hashSemLista) {
   const r = { sympla_entradas: 0, sympla_entradas_f: 0, sympla_entradas_m: 0, sympla_entradas_sem_genero: 0,
-    sympla_ingressos_total: 0, sympla_cortesia_entradas: 0, sympla_cortesia_f: 0, sympla_cortesia_m: 0, sympla_cortesia_sem_genero: 0, horas_sympla: {} };
-  const pagos = new Set(hashPagos || []), cort = new Set(hashCortesia || []);
+    sympla_ingressos_total: 0, pedidos_sem_ugo: 0, sympla_cortesia_entradas: 0, sympla_cortesia_f: 0, sympla_cortesia_m: 0, sympla_cortesia_sem_genero: 0, horas_sympla: {} };
+  const pagos = new Set(hashPagos || []), cort = new Set(hashCortesia || []), naUgo = new Set();
   for (const t of ingressos || []) {
     if (t.blocked === true) continue; // ingresso bloqueado/descartado (ex.: transferido, o novo é gerado para outra pessoa): não conta
     const e = String(t.accountEmail || '').trim().toLowerCase();
     if (!e) continue;
     const h = await sha256(e);
     const ePago = pagos.has(h), eCort = cort.has(h);
-    if (ePago) r.sympla_ingressos_total++; // todos os ingressos da UGO de compradores da Sympla (entrando ou não): serve para conferir o total vendido
+    if (ePago) { r.sympla_ingressos_total++; naUgo.add(h); } // todos os ingressos da UGO de compradores da Sympla (entrando ou não): serve para conferir o total vendido
     if (!t.checkin || !t.checkin.length) continue;
     if (!ePago && !eCort) continue;
     const g = classificarGeneroPorNome(t.name);
@@ -85,6 +85,8 @@ export async function contarSymplaPorHash(ingressos, hashPagos, hashCortesia, di
     if (ePago) { r.sympla_entradas++; if (g === 'F') r.sympla_entradas_f++; else if (g === 'M') r.sympla_entradas_m++; else r.sympla_entradas_sem_genero++; }
     else { r.sympla_cortesia_entradas++; if (g === 'F') r.sympla_cortesia_f++; else if (g === 'M') r.sympla_cortesia_m++; else r.sympla_cortesia_sem_genero++; }
   }
+  // pedidos que a lista da Sympla não traz e cujo comprador ainda não tem ingresso na UGO (a UGO demora a receber os pedidos novos)
+  r.pedidos_sem_ugo = (hashSemLista || []).filter((h) => !h || !naUgo.has(h)).length;
   return r;
 }
 
@@ -134,7 +136,7 @@ export async function coletarUgo(env, db, dia, hashes) {
   if (temHash) {
     try {
       const ing = await get(env, '/api/v1/ticket/event/' + uid);
-      Object.assign(r, await contarSymplaPorHash(ing.data || [], hashes.pagos, hashes.cortesia, dia));
+      Object.assign(r, await contarSymplaPorHash(ing.data || [], hashes.pagos, hashes.cortesia, dia, hashes.semLista));
       r.ugo_ingressos_api = (ing.data || []).length;
       try { // diagnóstico sem dados pessoais: campos do ingresso e contagem por valor (só campos com poucos valores diferentes)
         const arr = ing.data || [], cont = {}, campos = new Set();
