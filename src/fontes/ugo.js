@@ -138,6 +138,22 @@ export async function coletarUgo(env, db, dia, hashes) {
       const ing = await get(env, '/api/v1/ticket/event/' + uid);
       Object.assign(r, await contarSymplaPorHash(ing.data || [], hashes.pagos, hashes.cortesia, dia, hashes.semLista));
       r.ugo_ingressos_api = (ing.data || []).length;
+      try { // diagnóstico: o campo externalID liga o ingresso da UGO ao pedido/ingresso da Sympla? (só formatos e contagens)
+        const sp = new Set((hashes.idsPedidos || []).map(String)), si = new Set((hashes.idsIngressos || []).map(String));
+        const forma = (v) => String(v || '').replace(/[0-9]/g, '9').replace(/[A-Za-z]/g, 'A').slice(0, 30);
+        const d = { formas_externalID: {}, formas_complemento: {}, casa_pedido: 0, casa_ingresso: 0, casa_pedido_pedaco: 0, casa_ingresso_pedaco: 0, ativos: 0 };
+        for (const tk of ing.data || []) {
+          if (tk.blocked === true) continue; d.ativos++;
+          const a = String(tk.externalID || ''), b = String(tk.externalTicketComplementID || '');
+          const fa = forma(a), fb = forma(b);
+          if (Object.keys(d.formas_externalID).length < 6 || fa in d.formas_externalID) d.formas_externalID[fa] = (d.formas_externalID[fa] || 0) + 1;
+          if (Object.keys(d.formas_complemento).length < 6 || fb in d.formas_complemento) d.formas_complemento[fb] = (d.formas_complemento[fb] || 0) + 1;
+          const pedacos = [a, b].flatMap((x) => x.split(/[-_/]/)).filter(Boolean);
+          if (sp.has(a) || sp.has(b)) d.casa_pedido++; if (si.has(a) || si.has(b)) d.casa_ingresso++;
+          if (pedacos.some((x) => sp.has(x))) d.casa_pedido_pedaco++; if (pedacos.some((x) => si.has(x))) d.casa_ingresso_pedaco++;
+        }
+        r.ugo_ligacao_externalid = d;
+      } catch (e) { r.ugo_ligacao_externalid = { erro: e.message }; }
       try { // diagnóstico sem dados pessoais: campos do ingresso e contagem por valor (só campos com poucos valores diferentes)
         const arr = ing.data || [], cont = {}, campos = new Set();
         const pagos = new Set(hashes.pagos || []);

@@ -105,7 +105,8 @@ export async function coletarSympla(env, db, dia) {
   let qtdF = 0, qtdM = 0, qtdFPago = 0, qtdMPago = 0, faltaF = 0, faltaM = 0;
   let valorParticipantes = 0;
   const hashPagos = [], hashCortesia = [], hashSemLista = [];
-  let mediaIngPedido = 0;
+  let mediaIngPedido = 0, idsPedidos = [];
+  const numerosIng = part.map((p) => String(p.ticket_number || p.id || '')).filter(Boolean);
   const lotesAnt = {}; // por nome do ingresso: vendidos, entraram (check-in pela API) e valor
 
   for (const p of part) {
@@ -159,6 +160,7 @@ export async function coletarSympla(env, db, dia) {
   if (Array.isArray(pedidos) && pedidos.length) {
     const comPart = new Set(todosPart.map((p) => String(p.order_id !== undefined ? p.order_id : '')));
     const aprov = pedidos.filter((o) => o.order_status === 'APPROVED');
+    idsPedidos = aprov.map((o) => String(o.id));
     const falta = aprov.filter((o) => !comPart.has(String(o.id)));
     const porTipo = {}; let minD = '', maxD = '', valorFalta = 0;
     for (const o of falta) {
@@ -213,6 +215,6 @@ export async function coletarSympla(env, db, dia) {
     qtd_feminino: qtdF, qtd_masculino: qtdM, qtd_feminino_pago: qtdFPago, qtd_masculino_pago: qtdMPago,
     antecipado_lotes: Object.values(lotesAnt).map((l) => ({ lote: l.lote, vendidos: l.vendidos, entraram: l.entraram, valor: Math.round(l.valor * 100) / 100 })).sort((a, b) => b.vendidos - a.vendidos).slice(0, 12),
     cortesias, pedidos_nao_aprovados: Object.values(naoAprovados).reduce((a, b) => a + b, 0),
-    ingressos_estimados_sem_lista: estimadosSemLista, hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia, hash_pedidos_sem_lista: hashSemLista, media_ingressos_pedido: mediaIngPedido
+    ingressos_estimados_sem_lista: estimadosSemLista, hash_emails_pagos: hashPagos, hash_emails_cortesia: hashCortesia, hash_pedidos_sem_lista: hashSemLista, ids_pedidos: idsPedidos, ids_ingressos: numerosIng, media_ingressos_pedido: mediaIngPedido
   };
 }
