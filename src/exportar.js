@@ -1,5 +1,5 @@
 // Gravação na planilha antiga (Painel_Consolidado), para o bosque-analise e o resto continuarem lendo de lá.
-//  - ~5h10 (fechamento): relê a noite que acabou de fechar, todas as fontes, e grava.
+//  - 6h (fechamento): relê a noite que acabou de fechar, todas as fontes, e grava.
 //  - 10h (refaz): Sympla das últimas 7 noites de evento (estornos/ajustes), Zig (porta e bar) das últimas 2; grava as 7.
 // Só roda se EXPORTAR_URL e EXPORTAR_CHAVE estiverem configuradas na Cloudflare. A linha da noite é substituída, nunca duplicada.
 import { coletarNoite, calendarioDb, agoraBR, ehNoiteDeEvento } from './coletor.js';

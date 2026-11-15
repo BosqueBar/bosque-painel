@@ -41,9 +41,9 @@ export default {
 
   // A cada minuto: decide se é horário de evento e lê as fontes (cada uma separada, com o último dado bom guardado).
   async scheduled(event, env, ctx) {
-    if (event.cron === '10 8 * * *' || event.cron === '0 13 * * *') { // 5h10 e 10h de Brasília: grava na planilha
+    if (event.cron === '0 9 * * *' || event.cron === '0 13 * * *') { // 6h e 10h de Brasília: grava na planilha
       ctx.waitUntil((async () => {
-        try { await rodarExportacao(env, criarDb(env), event.cron === '10 8 * * *' ? 'fechamento' : 'refaz'); } catch (e) { console.log('exportação falhou: ' + (e && e.message || e)); }
+        try { await rodarExportacao(env, criarDb(env), event.cron === '0 9 * * *' ? 'fechamento' : 'refaz'); } catch (e) { console.log('exportação falhou: ' + (e && e.message || e)); }
       })());
       return;
     }
