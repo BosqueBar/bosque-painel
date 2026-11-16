@@ -81,12 +81,14 @@ export function exportarConfigurado(env) { return !!(env.EXPORTAR_URL && env.EXP
 
 export async function enviarParaPlanilha(env, db, dias) {
   if (!exportarConfigurado(env)) return { ok: false, erro: 'Falta configurar EXPORTAR_URL e EXPORTAR_CHAVE na Cloudflare.' };
-  const noites = [];
+  const noites = [], ignoradasConf = [];
   for (const dia of dias) {
     const r = await db.sel('pt_painel', { select: 'dados', noite: 'eq.' + dia });
-    if (r && r[0] && r[0].dados) noites.push(aplicarConferido(linhaParaPlanilha(r[0].dados), await lerConferido(db, dia)));
+    const conf = await lerConferido(db, dia);
+    if (conf.zig && conf.sympla && conf.bar) { ignoradasConf.push(dia); continue; } // noite conferida: a planilha não recebe mais nada dela
+    if (r && r[0] && r[0].dados) noites.push(aplicarConferido(linhaParaPlanilha(r[0].dados), conf));
   }
-  if (!noites.length) return { ok: true, gravadas: [], aviso: 'nenhuma noite com painel guardado' };
+  if (!noites.length) return { ok: true, gravadas: [], aviso: ignoradasConf.length ? 'noites conferidas, nada enviado: ' + ignoradasConf.join(', ') : 'nenhuma noite com painel guardado' };
   let resp, texto;
   try {
     resp = await fetch(env.EXPORTAR_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ chave: env.EXPORTAR_CHAVE, noites }), redirect: 'follow' });
