@@ -20,6 +20,10 @@ export function noitesDaSemanaAtual(hoje, cal) {
   return r;
 }
 
+// Campos de valor/saldo: se o painel não tiver o dado (vem 0), NÃO envia, e a planilha mantém o que já estava lá (a coluna fica como está).
+const MANTER_SE_ZERO = new Set(['bilheteria_total', 'bilheteria_sympla', 'bilheteria_porta', 'faturamento_bar', 'faturamento_bar_recebido',
+  'pessoas_na_casa', 'quantidade_venda_sympla', 'quantidade_venda_porta', 'quantidade_checkin_sympla', 'quantidade_checkin_porta',
+  'na_casa_feminino', 'na_casa_masculino', 'valor_vendas_liquido']);
 const CHAVES_FORA = new Set(['fontes', 'origem', 'porta_lotes', 'perm']);
 function brasilia(iso) {
   const d = new Date(new Date(iso).getTime() - 3 * 3600e3); if (isNaN(d)) return '';
@@ -31,6 +35,7 @@ export function linhaParaPlanilha(d) {
   const o = {};
   for (const k of Object.keys(d || {})) {
     if (CHAVES_FORA.has(k) || k.startsWith('origem_') || d[k] === undefined || d[k] === null) continue;
+    if (MANTER_SE_ZERO.has(k) && (Number(d[k]) === 0 || d[k] === '')) continue; // zerado: mantém a versão que a planilha já tem
     if (k === 'entradas_por_hora' || k === 'consumo_por_hora') o[k] = JSON.stringify(d[k]);
     else if (k === 'atualizado_em') o[k] = brasilia(d[k]);
     else o[k] = d[k];
