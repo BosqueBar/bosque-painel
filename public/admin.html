@@ -517,8 +517,9 @@ async function abaSaude() {
     return '<tr><td>' + NOME[k] + '</td><td>' + estado + '</td><td>' + (m === null ? 'nunca' : 'há ' + m + ' min') + (f.erro ? '<br><span style="color:#B3261E">' + esc(f.erro) + '</span>' : '') + '</td></tr>';
   }).join('');
   el().innerHTML = '<div class="card"><p class="b-st">Fontes da noite ' + dataBR(j.noite) + (j.ao_vivo ? ' (ao vivo)' : ' (fora do horário de evento)') + '</p><table class="t"><tr><th>Fonte</th><th>Estado</th><th>Última leitura</th></tr>' + linhas + '</table>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Durante o evento, a fonte fica "atrasada" se passar de 3 minutos sem ler (antes da abertura, a leitura é a cada 30 minutos). Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoSympla(j.noite) + cartaoPlanilha(j.exportacao);
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Durante o evento, a fonte fica "atrasada" se passar de 3 minutos sem ler (antes da abertura, a leitura é a cada 30 minutos). Se a Zig aparecer em falha na segunda, é só colar o token novo.</p></div>' + cartaoSympla(j.noite) + cartaoPlanilha(j.exportacao) + '<div class="card" style="margin-top:12px" id="cartao-conf"><p class="b-st">Conferido nos sistemas</p><p style="font-size:13px;color:var(--text-muted);margin:0">Carregando…</p></div>';
   document.getElementById('bt-exportar').onclick = enviarPlanilha;
+  carregarConferencia();
   document.getElementById('bt-sy-ver').onclick = verEventosSympla;
 }
 function cartaoSympla(noite) {
@@ -557,7 +558,27 @@ function cartaoPlanilha(x) {
   }
   return '<div class="card" style="margin-top:12px"><p class="b-st">Planilha antiga (Painel_Consolidado)</p><p style="margin:0 0 10px">' + estado + '</p>' +
     '<button class="bt sec" id="bt-exportar">Enviar as noites desta semana para a planilha agora</button><div id="res-exportar" style="font-size:13px;margin-top:10px"></div>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">O botão envia o que já está guardado aqui (não relê Sympla/Zig). Sozinho, o app grava às 6h (a noite que fechou) e às 10h (refaz a Sympla e a Zig só das noites da semana atual; a semana anterior fica como você conferiu, e na segunda o refaz não faz nada).</p></div>';
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">O botão envia o que já está guardado aqui (não relê Sympla/Zig). Sozinho, o app grava às 6h (a noite que fechou) e às 10h (refaz a Sympla e a Zig só das noites da semana atual; a semana anterior fica como você conferiu, e na segunda, até as 10h, refaz de quinta a domingo; depois das 10h nada mais muda).</p></div>';
+}
+async function carregarConferencia() {
+  const box = document.getElementById('cartao-conf'); if (!box) return;
+  try {
+    const r = await chamar('GET', '/api/admin/conferencia');
+    let h = '<p class="b-st">Conferido nos sistemas</p><p style="font-size:12px;color:var(--text-muted);margin:0 0 10px">Marque o que você já conferiu de cada noite. O que estiver marcado deixa de ser enviado para a planilha (e deixa de ser relido). Os totais (bilheteria total, pessoas na casa) também ficam parados.</p>';
+    h += '<table class="b-table"><tr><th></th><th>Zig</th><th>Sympla</th><th>Bar</th></tr>';
+    (r.noites || []).forEach(function (n) {
+      h += '<tr><td>' + dataBR(n.dia) + '</td>' + ['zig', 'sympla', 'bar'].map(function (s) { return '<td><input type="checkbox" data-dia="' + n.dia + '" data-s="' + s + '"' + (n.conferido && n.conferido[s] ? ' checked' : '') + '></td>'; }).join('') + '</tr>';
+    });
+    box.innerHTML = h + '</table><div id="res-conf" style="font-size:12px;margin-top:8px;color:var(--text-muted)"></div>';
+    box.querySelectorAll('input[type=checkbox]').forEach(function (c) {
+      c.onchange = async function () {
+        const dia = c.getAttribute('data-dia'), v = {};
+        box.querySelectorAll('input[data-dia="' + dia + '"]').forEach(function (x) { v[x.getAttribute('data-s')] = x.checked; });
+        try { await chamar('POST', '/api/admin/conferencia', Object.assign({ dia: dia }, v)); document.getElementById('res-conf').textContent = 'Salvo: ' + dataBR(dia); }
+        catch (e) { document.getElementById('res-conf').textContent = 'Não salvou: ' + (e.message || ''); c.checked = !c.checked; }
+      };
+    });
+  } catch (e) { box.innerHTML = '<p class="b-st">Conferido nos sistemas</p><p style="font-size:13px;color:#B3261E">' + esc(e.message || 'Falhou.') + '</p>'; }
 }
 async function enviarPlanilha() {
   const box = document.getElementById('res-exportar'); box.textContent = 'Enviando…';

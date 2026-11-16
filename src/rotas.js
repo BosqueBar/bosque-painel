@@ -4,7 +4,7 @@ import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinVa
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
-import { noitesDaSemanaAtual, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
+import { noitesParaRefazer, noitesAnteriores, lerConferido, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
 import { eventosDaData, idsGuardados } from './fontes/sympla.js';
 import { coletarNoite } from './coletor.js';
 
@@ -313,9 +313,22 @@ async function admin(request, url, env, db, p) {
     return json({ ok: true, dia, ids, ugo: { ingressos_na_api: du.ugo_ingressos_api, cruzados_com_email_sympla: du.sympla_ingressos_total, pedidos_sem_ingresso_na_ugo: du.pedidos_sem_ugo, lista: { emitidas: du.emitidas, entraram_total: du.lista_entraram, entraram_nao_cortesia: du.lista_pagantes_entraram, cortesia_validada: du.validadas, por_origem_entraram: du.origens_entradas, sympla_entradas: du.sympla_entradas }, ligacao: du.ugo_ligacao_externalid, aviso: du.aviso_ingressos_sympla || '', erro: (fu && fu[0] && fu[0].erro) || '' }, vendidos: d.quantidade_venda_sympla || 0, bilheteria_sympla: d.valor_vendas_liquido || 0,
       participantes_na_api: d.participantes_brutos || 0, pedidos_na_api: d.pedidos_na_api, pedidos_campos: d.pedidos_campos, faltantes: d.faltantes, paginacao_participantes: d.paginacao_participantes, ingressos_nos_pedidos: d.ingressos_nos_pedidos, status_nao_aprovados: d.status_nao_aprovados || {}, nao_aprovados: d.pedidos_nao_aprovados || 0, cortesias: d.cortesias || 0, valor_origem: d.valor_origem, aviso: d.aviso || '' });
   }
+  if (rota === 'conferencia' && request.method === 'GET') { // últimas noites de evento e o que já foi conferido (zig, sympla, bar)
+    const hoje = agoraBR().dia, cal = await calendarioDb(db);
+    const noites = [];
+    for (const d of noitesAnteriores(hoje, cal, 14)) noites.push({ dia: d, conferido: await lerConferido(db, d) });
+    return json({ noites });
+  }
+  if (rota === 'conferencia' && request.method === 'POST') {
+    const dia = String(b.dia || ''); if (!DATA.test(dia)) throw new Error('Data inválida.');
+    const v = { zig: !!b.zig, sympla: !!b.sympla, bar: !!b.bar };
+    await db.ins('pt_config', [{ chave: 'conferido_' + dia, valor: JSON.stringify(v), atualizado_em: new Date().toISOString() }], { upsert: true, conflito: 'chave' });
+    return json({ ok: true, dia, conferido: v });
+  }
   if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes
     const hoje = agoraBR().dia, cal = await calendarioDb(db);
-    const dias = Array.isArray(b.dias) && b.dias.length ? b.dias.filter((d) => DATA.test(String(d))).slice(0, 10) : noitesDaSemanaAtual(hoje, cal);
+    const dias = Array.isArray(b.dias) && b.dias.length ? b.dias.filter((d) => DATA.test(String(d))).slice(0, 10) : noitesParaRefazer(hoje, cal, agoraBR().min, false);
+    if (!dias.length) return json({ dias, resultado: { ok: true, gravadas: [], aviso: 'Segunda depois das 10h: a semana anterior está conferida e não é mais enviada.' } });
     const r = await enviarParaPlanilha(env, db, dias);
     return json({ dias, resultado: r });
   }

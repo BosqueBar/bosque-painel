@@ -13,6 +13,18 @@ export function noitesAnteriores(hoje, cal, nDias) {
   return r;
 }
 
+// Quais noites o refaz/botão pode reescrever na planilha (a Annie confere toda segunda e depois disso nada da semana anterior muda):
+//  - segunda-feira até as 10h: quinta a domingo da semana anterior (4 dias antes); a partir das 10h de segunda: nada;
+//  - terça a domingo: só as noites da semana atual (de segunda até ontem).
+// `doCron` = a gravação automática das 10h (pode rodar na segunda mesmo com 1–2 minutos de atraso).
+export function noitesParaRefazer(hoje, cal, minutoDoDia, doCron) {
+  if (diaSemana(hoje) !== 1) return noitesDaSemanaAtual(hoje, cal);
+  if (!doCron && minutoDoDia >= 600) return [];
+  const r = [];
+  for (let i = 1; i <= 4; i++) { const d = somarDias(hoje, -i); if (ehNoiteDeEvento(d, cal)) r.push(d); }
+  return r;
+}
+
 // Noites de evento da SEMANA ATUAL (de segunda até ontem). Na segunda-feira a lista é vazia: a semana anterior já foi conferida pela Annie e não pode mais ser reescrita.
 export function noitesDaSemanaAtual(hoje, cal) {
   const r = [], voltar = (diaSemana(hoje) + 6) % 7; // 0 na segunda, 6 no domingo
@@ -43,6 +55,28 @@ export function linhaParaPlanilha(d) {
   return o;
 }
 
+// "Conferido nos sistemas": a Annie marca (zig, sympla, bar) e a planilha deixa de receber aquelas colunas dessa noite.
+const COLUNAS_SISTEMA = {
+  sympla: (k) => k.includes('sympla') || k.startsWith('falta_entrar_antecipado'),
+  zig: (k) => k.includes('porta'),
+  bar: (k) => k.startsWith('faturamento_bar') || k.startsWith('consumo')
+};
+const TOTAIS_JUNTOS = new Set(['bilheteria_total', 'pessoas_na_casa', 'na_casa_feminino', 'na_casa_masculino', 'cortesias_total', 'entradas_por_hora']);
+export async function lerConferido(db, dia) {
+  try { const g = await db.sel('pt_config', { select: 'valor', chave: 'eq.conferido_' + dia }); return g && g[0] && g[0].valor ? JSON.parse(g[0].valor) : {}; } catch (e) { return {}; }
+}
+export function aplicarConferido(linha, conf) {
+  const marcados = Object.keys(COLUNAS_SISTEMA).filter((s) => conf && conf[s]);
+  if (!marcados.length) return linha;
+  const o = {};
+  for (const k of Object.keys(linha)) {
+    if (k === 'data' || k === 'evento') { o[k] = linha[k]; continue; }
+    if (marcados.some((s) => COLUNAS_SISTEMA[s](k)) || TOTAIS_JUNTOS.has(k)) continue; // conferido: não mexe (os totais juntos também, porque dependem dos três)
+    o[k] = linha[k];
+  }
+  return o;
+}
+
 export function exportarConfigurado(env) { return !!(env.EXPORTAR_URL && env.EXPORTAR_CHAVE); }
 
 export async function enviarParaPlanilha(env, db, dias) {
@@ -50,7 +84,7 @@ export async function enviarParaPlanilha(env, db, dias) {
   const noites = [];
   for (const dia of dias) {
     const r = await db.sel('pt_painel', { select: 'dados', noite: 'eq.' + dia });
-    if (r && r[0] && r[0].dados) noites.push(linhaParaPlanilha(r[0].dados));
+    if (r && r[0] && r[0].dados) noites.push(aplicarConferido(linhaParaPlanilha(r[0].dados), await lerConferido(db, dia)));
   }
   if (!noites.length) return { ok: true, gravadas: [], aviso: 'nenhuma noite com painel guardado' };
   let resp, texto;
@@ -75,11 +109,13 @@ export async function rodarExportacao(env, db, modo) {
     dias = noitesAnteriores(hoje, cal, 1);
     for (const d of dias) { try { await coletarNoite(env, db, d, { forcar: true }); resumo.leituras[d] = 'ok'; } catch (e) { resumo.leituras[d] = String((e && e.message) || e).slice(0, 120); } }
   } else {
-    dias = noitesDaSemanaAtual(hoje, cal); // só a semana atual: as semanas anteriores ficam como a Annie conferiu na segunda
-    if (!dias.length) { resumo.pulou = 'segunda-feira ou semana sem noites: nada a refazer (semana anterior já conferida)'; await guardarStatus(db, modo, resumo); return resumo; }
+    dias = noitesParaRefazer(hoje, cal, agoraBR().min, true);
+    if (!dias.length) { resumo.pulou = 'nenhuma noite a refazer hoje (semana anterior já conferida)'; await guardarStatus(db, modo, resumo); return resumo; }
     const duas = new Set(dias.slice(0, 2));
     for (const d of dias) {
-      const fontes = duas.has(d) ? ['sympla', 'zig_ingressos', 'zig_bar'] : ['sympla'];
+      const conf = await lerConferido(db, d);
+      const fontes = (duas.has(d) ? ['sympla', 'zig_ingressos', 'zig_bar'] : ['sympla']).filter((f) => !(f === 'sympla' && conf.sympla) && !(f === 'zig_ingressos' && conf.zig) && !(f === 'zig_bar' && conf.bar));
+      if (!fontes.length) { resumo.leituras[d] = 'conferido: não relido'; continue; }
       try { await coletarNoite(env, db, d, { forcar: true, fontes }); resumo.leituras[d] = fontes.join('+'); } catch (e) { resumo.leituras[d] = String((e && e.message) || e).slice(0, 120); }
     }
   }
