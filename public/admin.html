@@ -564,18 +564,18 @@ async function carregarConferencia() {
   const box = document.getElementById('cartao-conf'); if (!box) return;
   try {
     const r = await chamar('GET', '/api/admin/conferencia');
-    let h = '<p class="b-st">Conferido nos sistemas</p><p style="font-size:12px;color:var(--text-muted);margin:0 0 10px">Marque o que você já conferiu de cada noite. O que estiver marcado deixa de ser enviado para a planilha (e deixa de ser relido). Os totais (bilheteria total, pessoas na casa) também ficam parados.</p>';
-    h += '<table class="b-table"><tr><th></th><th>Zig</th><th>Sympla</th><th>Bar</th></tr>';
+    let h = '<p class="b-st">Conferido nos sistemas</p><p style="font-size:12px;color:var(--text-muted);margin:0 0 10px">Marque a noite quando você conferir Zig, Sympla e Bar. Marcada, ela deixa de ser enviada para a planilha e deixa de ser relida pelo painel.</p>';
+    h += '<table class="b-table"><tr><th></th><th>Conferido</th></tr>';
     (r.noites || []).forEach(function (n) {
-      h += '<tr><td>' + dataBR(n.dia) + '</td>' + ['zig', 'sympla', 'bar'].map(function (s) { return '<td><input type="checkbox" data-dia="' + n.dia + '" data-s="' + s + '"' + (n.conferido && n.conferido[s] ? ' checked' : '') + '></td>'; }).join('') + '</tr>';
+      const c = n.conferido || {}, tudo = !!(c.zig && c.sympla && c.bar);
+      h += '<tr><td>' + dataBR(n.dia) + '</td><td><input type="checkbox" data-dia="' + n.dia + '"' + (tudo ? ' checked' : '') + '></td></tr>';
     });
     box.innerHTML = h + '</table><div id="res-conf" style="font-size:12px;margin-top:8px;color:var(--text-muted)"></div>';
     box.querySelectorAll('input[type=checkbox]').forEach(function (c) {
       c.onchange = async function () {
-        const dia = c.getAttribute('data-dia'), v = {};
-        box.querySelectorAll('input[data-dia="' + dia + '"]').forEach(function (x) { v[x.getAttribute('data-s')] = x.checked; });
-        try { await chamar('POST', '/api/admin/conferencia', Object.assign({ dia: dia }, v)); document.getElementById('res-conf').textContent = 'Salvo: ' + dataBR(dia); }
-        catch (e) { document.getElementById('res-conf').textContent = 'Não salvou: ' + (e.message || ''); c.checked = !c.checked; }
+        const dia = c.getAttribute('data-dia'), v = c.checked;
+        try { await chamar('POST', '/api/admin/conferencia', { dia: dia, zig: v, sympla: v, bar: v }); document.getElementById('res-conf').textContent = (v ? 'Conferida: ' : 'Desmarcada: ') + dataBR(dia); }
+        catch (e) { document.getElementById('res-conf').textContent = 'Não salvou: ' + (e.message || ''); c.checked = !v; }
       };
     });
   } catch (e) { box.innerHTML = '<p class="b-st">Conferido nos sistemas</p><p style="font-size:13px;color:#B3261E">' + esc(e.message || 'Falhou.') + '</p>'; }
