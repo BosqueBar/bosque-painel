@@ -31,9 +31,18 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
   const symCortM = cortUgoAcima ? (u.sympla_cortesia_m || 0) : (s.cortesia_validada_masculino || 0);
   const symCortSem = cortUgoAcima ? (u.sympla_cortesia_sem_genero || 0) : 0;
 
-  const cortValF = symCortF + (z.cortesia_validada_feminino || 0) + (u.validadas_f || 0);
-  const cortValM = symCortM + (z.cortesia_validada_masculino || 0) + (u.validadas_m || 0);
-  const cortValTotal = symCortTotal + (z.cortesia_validada_feminino || 0) + (z.cortesia_validada_masculino || 0) + (u.validadas || 0);
+  // Lista: quem entrou pela lista e NÃO pagou na porta é cortesia, mesmo que a UGO não tenha marcado "cortesia" (a catraca da UGO conta todos).
+  // A porta paga (Zig) = bilheteria sem lista (a UGO sabe quantos: origem "bilheteria") + lista paga.
+  const portaPaga = z.ingressos_validados || 0, ugoBil = (u.origens_entradas && u.origens_entradas.bilheteria) || 0;
+  const listaPaga = Math.min(u.lista_pagantes_entraram || 0, Math.max(0, portaPaga - Math.min(ugoBil, portaPaga)));
+  const listaCortesiaTotal = Math.max(u.validadas || 0, (u.lista_entraram || 0) - listaPaga);
+  const extraCort = listaCortesiaTotal - (u.validadas || 0); // cortesia de lista sem a marca da UGO
+  const vf = u.validadas_f || 0, vm = u.validadas_m || 0;
+  const extraF = (vf + vm) > 0 ? Math.round(extraCort * vf / (vf + vm)) : 0, extraM = (vf + vm) > 0 ? extraCort - extraF : 0, extraSem = extraCort - extraF - extraM; // gênero na mesma proporção da cortesia marcada
+
+  const cortValF = symCortF + (z.cortesia_validada_feminino || 0) + vf + extraF;
+  const cortValM = symCortM + (z.cortesia_validada_masculino || 0) + vm + extraM;
+  const cortValTotal = symCortTotal + (z.cortesia_validada_feminino || 0) + (z.cortesia_validada_masculino || 0) + listaCortesiaTotal;
 
   // check-in da Sympla: o maior entre API e UGO
   const ckApi = s.checkin_realizados || 0, ckUgo = u.sympla_entradas || 0;
@@ -87,17 +96,17 @@ export function montarConsolidado(dia, sympla, zigIng, zigBar, ugo, nomeEvento) 
     cortesias_total: (s.cortesias || 0) + (z.cortesias || 0),
     cortesia_validada_feminino: cortValF,
     cortesia_validada_masculino: cortValM,
-    cortesia_validada_sem_genero: (u.validadas_sem_genero || 0) + symCortSem,
-    quantidade_cortesia_validada_lista: u.validadas || 0,
+    cortesia_validada_sem_genero: (u.validadas_sem_genero || 0) + symCortSem + extraSem,
+    quantidade_cortesia_validada_lista: listaCortesiaTotal,
     entradas_por_hora: entradasPorHora,
     consumo_por_hora: consumoPorHora,
     // "Por onde entrou" fecha com "Na casa": a lista que pagou paga na porta (já está nos ingressos da porta), então sai da bilheteria da porta
     origem_sympla_pago: Math.max(0, ckUsado),
-    origem_porta_pago: Math.max(0, (z.ingressos_validados || 0) - Math.min(z.ingressos_validados || 0, u.lista_pagantes_entraram || 0)),
-    origem_lista_paga: Math.min(z.ingressos_validados || 0, u.lista_pagantes_entraram || 0),
+    origem_porta_pago: Math.max(0, portaPaga - listaPaga),
+    origem_lista_paga: listaPaga,
     origem_cortesia_sympla: symCortTotal,
     origem_cortesia_porta: (z.cortesia_validada_feminino || 0) + (z.cortesia_validada_masculino || 0),
-    origem_cortesia_lista: u.validadas || 0,
+    origem_cortesia_lista: listaCortesiaTotal,
     porta_lotes: z.porta_lotes || [],
     antecipado_lotes: s.antecipado_lotes || [],
     lista_convidados: u.lista_convidados || 0,
