@@ -4,7 +4,7 @@ import { MODELOS, ehSocio, ehAdmin, novaChaveLink, hashLink, pinAleatorio, pinVa
 import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
-import { noitesAnteriores, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
+import { noitesDaSemanaAtual, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
 import { eventosDaData, idsGuardados } from './fontes/sympla.js';
 import { coletarNoite } from './coletor.js';
 
@@ -315,7 +315,7 @@ async function admin(request, url, env, db, p) {
   }
   if (rota === 'exportar' && request.method === 'POST') { // "Enviar agora para a planilha": usa o que já está guardado, sem reler as fontes
     const hoje = agoraBR().dia, cal = await calendarioDb(db);
-    const dias = Array.isArray(b.dias) && b.dias.length ? b.dias.filter((d) => DATA.test(String(d))).slice(0, 10) : noitesAnteriores(hoje, cal, 7);
+    const dias = Array.isArray(b.dias) && b.dias.length ? b.dias.filter((d) => DATA.test(String(d))).slice(0, 10) : noitesDaSemanaAtual(hoje, cal);
     const r = await enviarParaPlanilha(env, db, dias);
     return json({ dias, resultado: r });
   }

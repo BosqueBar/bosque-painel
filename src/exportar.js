@@ -1,14 +1,22 @@
 // Gravação na planilha antiga (Painel_Consolidado), para o bosque-analise e o resto continuarem lendo de lá.
 //  - 6h (fechamento): relê a noite que acabou de fechar, todas as fontes, e grava.
-//  - 10h (refaz): Sympla das últimas 7 noites de evento (estornos/ajustes), Zig (porta e bar) das últimas 2; grava as 7.
+//  - 10h (refaz): Sympla das noites de evento da SEMANA ATUAL (estornos/ajustes), Zig (porta e bar) das 2 mais recentes; grava essas noites.
+//    Semanas anteriores nunca são reescritas (a Annie confere toda segunda e edita à mão). Na segunda-feira o refaz não faz nada.
 // Só roda se EXPORTAR_URL e EXPORTAR_CHAVE estiverem configuradas na Cloudflare. A linha da noite é substituída, nunca duplicada.
 import { coletarNoite, calendarioDb, agoraBR, ehNoiteDeEvento } from './coletor.js';
-import { somarDias } from './util.js';
+import { somarDias, diaSemana } from './util.js';
 
 // Noites de evento entre ontem e `nDias` atrás, da mais recente para a mais antiga.
 export function noitesAnteriores(hoje, cal, nDias) {
   const r = [];
   for (let i = 1; i <= nDias; i++) { const d = somarDias(hoje, -i); if (ehNoiteDeEvento(d, cal)) r.push(d); }
+  return r;
+}
+
+// Noites de evento da SEMANA ATUAL (de segunda até ontem). Na segunda-feira a lista é vazia: a semana anterior já foi conferida pela Annie e não pode mais ser reescrita.
+export function noitesDaSemanaAtual(hoje, cal) {
+  const r = [], voltar = (diaSemana(hoje) + 6) % 7; // 0 na segunda, 6 no domingo
+  for (let i = 1; i <= voltar; i++) { const d = somarDias(hoje, -i); if (ehNoiteDeEvento(d, cal)) r.push(d); }
   return r;
 }
 
@@ -62,7 +70,8 @@ export async function rodarExportacao(env, db, modo) {
     dias = noitesAnteriores(hoje, cal, 1);
     for (const d of dias) { try { await coletarNoite(env, db, d, { forcar: true }); resumo.leituras[d] = 'ok'; } catch (e) { resumo.leituras[d] = String((e && e.message) || e).slice(0, 120); } }
   } else {
-    dias = noitesAnteriores(hoje, cal, 7);
+    dias = noitesDaSemanaAtual(hoje, cal); // só a semana atual: as semanas anteriores ficam como a Annie conferiu na segunda
+    if (!dias.length) { resumo.pulou = 'segunda-feira ou semana sem noites: nada a refazer (semana anterior já conferida)'; await guardarStatus(db, modo, resumo); return resumo; }
     const duas = new Set(dias.slice(0, 2));
     for (const d of dias) {
       const fontes = duas.has(d) ? ['sympla', 'zig_ingressos', 'zig_bar'] : ['sympla'];

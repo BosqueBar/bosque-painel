@@ -556,8 +556,8 @@ function cartaoPlanilha(x) {
     estado = '<span class="chip ' + (ok ? 'verde' : 'verm') + '">' + (ok ? 'última gravação ok' : 'última gravação com erro') + '</span> <span style="font-size:12px;color:var(--text-muted)">' + (u.modo === 'fechamento' ? 'fechamento 6h' : 'refaz 10h') + ' · ' + quando(u.em) + (ok ? '' : ' · ' + esc((e && e.erro) || 'sem resposta')) + '</span>';
   }
   return '<div class="card" style="margin-top:12px"><p class="b-st">Planilha antiga (Painel_Consolidado)</p><p style="margin:0 0 10px">' + estado + '</p>' +
-    '<button class="bt sec" id="bt-exportar">Enviar as últimas noites para a planilha agora</button><div id="res-exportar" style="font-size:13px;margin-top:10px"></div>' +
-    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">O botão envia o que já está guardado aqui (não relê Sympla/Zig). Sozinho, o app grava às 6h (a noite que fechou) e às 10h (refaz a Sympla das últimas 7 noites e a Zig das últimas 2).</p></div>';
+    '<button class="bt sec" id="bt-exportar">Enviar as noites desta semana para a planilha agora</button><div id="res-exportar" style="font-size:13px;margin-top:10px"></div>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">O botão envia o que já está guardado aqui (não relê Sympla/Zig). Sozinho, o app grava às 6h (a noite que fechou) e às 10h (refaz a Sympla e a Zig só das noites da semana atual; a semana anterior fica como você conferiu, e na segunda o refaz não faz nada).</p></div>';
 }
 async function enviarPlanilha() {
   const box = document.getElementById('res-exportar'); box.textContent = 'Enviando…';
