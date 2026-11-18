@@ -166,7 +166,9 @@ function renderizarProximo(d, perm) {
     htmlFontes(d.fontes, false, true) +
     ((topo || chips) ? '<div class="card">' + topo + chips + '' + '</div>' : '') +
     (perm.contagem ? '<div class="card-outline"><p class="b-st">Antecipado por gênero</p><table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
-      '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr></table></div>' : '');
+      '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr>' +
+      (function () { const f = Number(d.falta_entrar_antecipado_feminino) || 0, m = Number(d.falta_entrar_antecipado_masculino) || 0, s = f + m; if (!s) return ''; const pf = Math.round(f * 100 / s); return '<tr><td>Proporção</td><td class="n">' + pf + '%</td><td class="n">' + (100 - pf) + '%</td></tr>'; })() +
+      '</table></div>' : '');
 }
 function renderizar(d, hoje, noite, aoVivo, proxima) {
   const conteudo = document.getElementById('conteudo');
