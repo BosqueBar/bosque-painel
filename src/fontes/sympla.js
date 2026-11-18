@@ -245,13 +245,15 @@ export async function varreduraSympla(token, ids) {
       o.pedidos_distintos = ordens.size;
       return o;
     };
+    r.p_v3 = await contar('v3', '');
+    r.p_v3_cancelados = await contar('v3', 'cancelled_filter=include');
     r.p151 = await contar('v1.5.1', '');
     r.p151_cancelados = await contar('v1.5.1', 'cancelled_filter=include');
     r.p160 = await contar('v1.6.0', '');
     r.p160_cancelados = await contar('v1.6.0', 'cancelled_filter=include');
     r.p160_so_cancelados = await contar('v1.6.0', 'cancelled_filter=only');
     // pedidos (valor e quantidade por status) nas duas versões
-    for (const v of ['v1.5.1', 'v1.6.0']) {
+    for (const v of ['v3', 'v1.5.1', 'v1.6.0']) {
       const o = { total: 0, por_status: {}, valor_aprovado: 0 };
       try {
         let pag = 1, cursor = '';
@@ -259,7 +261,7 @@ export async function varreduraSympla(token, ids) {
           const j = await g(v, '/orders?' + (cursor ? 'cursor=' + encodeURIComponent(cursor) : 'page=' + pag) + '&page_size=200'), d = j.data || [];
           if (!d.length) break;
           o.total += d.length;
-          for (const x of d) { const s = String(x.order_status || '(vazio)'); o.por_status[s] = (o.por_status[s] || 0) + 1; if (s === 'APPROVED') o.valor_aprovado += Number(x.order_total_net_value) || 0; }
+          for (const x of d) { const s = String(x.order_status || '(vazio)'); o.por_status[s] = (o.por_status[s] || 0) + 1; if (s === 'APPROVED' || s === 'A') o.valor_aprovado += Number(x.order_total_net_value) || 0; }
           const prox = j.pagination && j.pagination.next_cursor; if (prox) cursor = String(prox); else { cursor = ''; pag++; }
         }
       } catch (e) { o.erro = String((e && e.message) || e).slice(0, 100); }
