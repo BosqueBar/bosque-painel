@@ -5,7 +5,7 @@ import { agoraBR, decidirModo, calendarioDb } from './coletor.js';
 import { somarDias } from './util.js';
 import { converterLinha } from './historico.js';
 import { noitesParaRefazer, noitesAnteriores, lerConferido, enviarParaPlanilha, exportarConfigurado } from './exportar.js';
-import { eventosDaData, idsGuardados } from './fontes/sympla.js';
+import { eventosDaData, idsGuardados , varreduraSympla } from './fontes/sympla.js';
 import { coletarNoite } from './coletor.js';
 
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), {
@@ -295,6 +295,14 @@ async function admin(request, url, env, db, p) {
     if (!DATA.test(dia)) throw new Error('Data inválida.');
     if (!env.SYMPLA_TOKEN) throw new Error('Falta o token da Sympla na Cloudflare.');
     return json({ dia, escolhidos: await idsGuardados(db, dia), eventos: await eventosDaData(env.SYMPLA_TOKEN, dia) });
+  }
+  if (rota === 'sympla-varredura' && request.method === 'POST') { // diagnóstico: todas as formas de ler a Sympla para a mesma noite (só contagens)
+    const dia = String(b.dia || ''); if (!DATA.test(dia)) throw new Error('Data inválida.');
+    if (!env.SYMPLA_TOKEN) throw new Error('Falta o token da Sympla na Cloudflare.');
+    let ids = await idsGuardados(db, dia);
+    if (!ids.length) ids = (await eventosDaData(env.SYMPLA_TOKEN, dia)).map((e) => e.id);
+    if (!ids.length) throw new Error('A Sympla não tem evento nessa data.');
+    return json({ dia, resultado: await varreduraSympla(env.SYMPLA_TOKEN, ids) });
   }
   if (rota === 'sympla-eventos' && request.method === 'POST') { // escolhe quais eventos somar e relê a Sympla da noite agora
     const dia = String(b.dia || '');
