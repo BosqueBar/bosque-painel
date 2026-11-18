@@ -8,6 +8,7 @@
 import { buscarJson, sha256 } from '../util.js';
 
 const BASE = 'https://api.sympla.com.br/public/v1.5.1';
+const BASE160 = 'https://api.sympla.com.br/public/v1.6.0';
 const CAMPO_GENERO = 'Gênero';
 
 // Lista os eventos da Sympla que começam em `dia` (para a Annie escolher quais somar).
@@ -49,11 +50,12 @@ async function achaEventoId(db, token, dia) {
 
 // Lê TODAS as páginas até vir uma vazia (não confia no total de páginas que a Sympla informa: ele pode vir menor que o real).
 // Pede 200 por página e tira repetidos pelo id.
-async function todasPaginas(url, token, info) {
+async function todasPaginas(url, token, info, v160) {
   const todos = [], vistos = new Set();
   let pagina = 1, ultimaMarca = '', cursor = '';
   while (pagina <= 200) {
-    const q = cursor ? '?cursor=' + encodeURIComponent(cursor) + '&page_size=200' : '?page=' + pagina + '&page_size=200';
+    const tam = v160 ? 500 : 200;
+    const q = cursor ? '?cursor=' + encodeURIComponent(cursor) + '&page_size=' + tam : (v160 ? '?page_size=' + tam : '?page=' + pagina + '&page_size=' + tam);
     const j = await buscarJson(url + q, { headers: { s_token: token } }, 25000);
     if (info && pagina === 1) info.paginacao = Object.keys(j.pagination || {}); // só os NOMES dos campos de paginação (diagnóstico)
     const d = j.data || [];
@@ -69,7 +71,7 @@ async function todasPaginas(url, token, info) {
     }
     if (novos === 0) break;
     const prox = j.pagination && (j.pagination.next_cursor || j.pagination.nextCursor);
-    if (prox) { cursor = String(prox); if (info) info.usouCursor = true; } else if (cursor) break; // acabou o cursor
+    if (prox) { cursor = String(prox); if (info) info.usouCursor = true; } else if (cursor || v160) break; // acabou o cursor (v1.6.0 só pagina por cursor)
     pagina++;
   }
   return todos;
@@ -89,7 +91,8 @@ export async function coletarSympla(env, db, dia) {
   const infoPag = {};
   for (const id of ids) {
     const [pp, oo] = await Promise.all([
-      todasPaginas(BASE + '/events/' + id + '/participants', token, infoPag),
+      // PARTICIPANTES pela v1.6.0: a v1.5.1 deixa de listar ~45% dos ingressos de alguns eventos (19/11: 167 contra 312). A v1.6.0 bate com o borderô.
+      todasPaginas(BASE160 + '/events/' + id + '/participants', token, infoPag, true).catch(() => { infoPag.caiuParaV151 = true; return todasPaginas(BASE + '/events/' + id + '/participants', token, infoPag); }),
       todasPaginas(BASE + '/events/' + id + '/orders', token).catch((e) => { return { erro: e.message }; })
     ]);
     todosPart = todosPart.concat(pp);
