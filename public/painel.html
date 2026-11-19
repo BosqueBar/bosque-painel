@@ -148,6 +148,14 @@ function htmlFontes(fontes, noiteAoVivo, proxima) {
     return '<span class="' + cls + '">' + txt + '</span>';
   }).join('') + '</div>';
 }
+function htmlListaGenero(d) {
+  const f = Number(d.lista_convidados_feminino) || 0, m = Number(d.lista_convidados_masculino) || 0, s = Number(d.lista_convidados_sem_genero) || 0, tot = f + m;
+  if (!tot && !s) return '';
+  const pf = tot ? Math.round(f * 100 / tot) : 0;
+  return '<tr><td>Feminino</td><td class="n">' + fmt(f) + (tot ? ' <em>(' + pf + '%)</em>' : '') + '</td></tr>' +
+    '<tr><td>Masculino</td><td class="n">' + fmt(m) + (tot ? ' <em>(' + (100 - pf) + '%)</em>' : '') + '</td></tr>' +
+    (s ? '<tr><td>Sem gênero identificado</td><td class="n">' + fmt(s) + '</td></tr>' : '');
+}
 function renderizarProximo(d, perm) {
   const conteudo = document.getElementById('conteudo');
   document.getElementById('nome-evento').textContent = d.evento || 'Próximo evento';
@@ -168,7 +176,8 @@ function renderizarProximo(d, perm) {
     (perm.contagem ? '<div class="card-outline"><p class="b-st">Antecipado por gênero</p><table class="b-table"><tr><th></th><th>Fem.</th><th>Masc.</th></tr>' +
       '<tr><td>Ingressos vendidos</td><td class="n">' + fmt(d.falta_entrar_antecipado_feminino) + '</td><td class="n">' + fmt(d.falta_entrar_antecipado_masculino) + '</td></tr>' +
       (function () { const f = Number(d.falta_entrar_antecipado_feminino) || 0, m = Number(d.falta_entrar_antecipado_masculino) || 0, s = f + m; if (!s) return ''; const pf = Math.round(f * 100 / s); return '<tr><td>Proporção</td><td class="n">' + pf + '%</td><td class="n">' + (100 - pf) + '%</td></tr>'; })() +
-      '</table></div>' : '');
+      '</table></div>' : '') +
+    (perm.contagem && listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table"><tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' + htmlListaGenero(d) + '</table></div>' : '');
 }
 function renderizar(d, hoje, noite, aoVivo, proxima) {
   const conteudo = document.getElementById('conteudo');
@@ -219,7 +228,7 @@ function renderizar(d, hoje, noite, aoVivo, proxima) {
       (cvS ? '<p class="b-nota">+ ' + fmt(cvS) + ' cortesia sem gênero identificado</p>' : '') + '</div>' : '') +
     (perm.contagem ? htmlOrigem(d, perm) : '') +
     (perm.contagem && listaNomes > 0 ? '<div class="card-outline"><p class="b-st">Lista</p><table class="b-table">' +
-      '<tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' +
+      '<tr><td>Nomes na lista</td><td class="n">' + fmt(listaNomes) + '</td></tr>' + htmlListaGenero(d) +
       '<tr><td>Entraram</td><td class="n">' + fmt(listaEntraram) + '</td></tr>' +
       '<tr><td>Conversão</td><td class="n"><strong>' + pctConversaoLista + '%</strong></td></tr></table></div>' : '') +
     graficos;
